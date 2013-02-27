@@ -1,0 +1,23 @@
+DICOM2FEM
+
+About
+-----
+
+Generation of finite element meshes using computed tomography scans.
+Segmentation is based on the graph cut algorithm.
+
+Links
+-----
+
+  https://github.com/vlukes/dicom2fem
+  http://sfepy.org/dicom2fem
+
+Author
+------
+
+Vladimir Lukes
+
+License
+-------
+
+New BSD License, see the LICENSE file.

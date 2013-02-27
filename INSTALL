@@ -1,0 +1,14 @@
+Installation Instructions
+-------------------------
+
+Follow the instructions is pyseg_base/INSTALL.
+
+Install DICOM2FEM:
+
+  git clone https://github.com/vlukes/dicom2fem.git
+
+
+Sample DICOM data can be found at:
+
+  * http://www.mathworks.com/matlabcentral/fileexchange/2762-dicom-example-files?download=true
+  * http://www.osirix-viewer.com/datasets/

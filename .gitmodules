@@ -1,0 +1,3 @@
+[submodule "pyseg_base"]
+	path = pyseg_base
+	url = https://github.com/vlukes/pyseg_base
