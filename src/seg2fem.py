@@ -341,6 +341,11 @@ def gen_mesh_from_voxels(voxels, dims, etype='q'):
 
     return mesh
 
+smooth_methods = {
+    'none': None,
+    'taubin': smooth_mesh,
+    }
+
 usage = '%prog [options]\n' + __doc__.rstrip()
 help = {
     'in_file': 'input *.mat file with "data" field',
