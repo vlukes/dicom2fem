@@ -24,7 +24,7 @@ from PyQt4.QtGui import QApplication, QMainWindow, QWidget,\
 sys.path.append("./pyseg_base/src/")
 
 import dcmreaddata as dcmreader
-import seed_editor_qt as seededitor
+from seed_editor_qt import QTSeedEditor
 import seg2fem
 import pycat
 from meshio import supported_capabilities, supported_formats
@@ -249,7 +249,7 @@ class MainWindow(QMainWindow):
         if factor is None:
             value, ok = QInputDialog.getText(self, 'Reduce DICOM data',
                                              'Reduce factor [0-1.0]:',
-                                             text='%f' % default)
+                                             text='%.2f' % default)
             if ok:
                 vals = value.split(',')
                 if len(vals) > 1:
@@ -270,13 +270,12 @@ class MainWindow(QMainWindow):
             self.dcm_3Ddata = ndimage.zoom(self.dcm_3Ddata, self.dcm_zoom,
                                            prefilter=False, mode='nearest')
             self.voxel_sizemm = self.voxel_sizemm / self.dcm_zoom
+            self.setLabelText(self.text_dcm_data, self.getDcmInfo())
 
             self.statusBar().showMessage('Ready')
 
         else:
             self.statusBar().showMessage('No valid reduce factor!')
-
-        return val
 
     def cropDcm(self):
         if self.dcm_3Ddata is None:
@@ -350,7 +349,7 @@ class MainWindow(QMainWindow):
         nzs = self.segmentation_data.nonzero()
         nn = nzs[0].shape[0]
         if nn > 0:
-            aux = ' num_pixels = %d, volume = %.2e mm3' % (nn, nn * self.voxel_volume)
+            aux = ' voxels = %d, volume = %.2e mm3' % (nn, nn * self.voxel_volume)
             self.setLabelText(self.text_seg_data, aux)
             self.setLabelText(self.text_mesh_in, 'segmentation data')
             self.statusBar().showMessage('Ready')
@@ -365,13 +364,15 @@ class MainWindow(QMainWindow):
 
         igc = pycat.ImageGraphCut(self.dcm_3Ddata,
                                   voxelsize=self.voxel_sizemm)
+
         pyed = QTSeedEditor(self.dcm_3Ddata,
-                            seeds=self.segmentation_data,
+                            seeds=self.segmentation_seeds,
                             modeFun=igc.interactivity_loop,
                             voxelVolume=self.voxel_volume)
         pyed.exec_()
 
-        self.segmentation_data = pyed.getSeeds().nonzero()
+        self.segmentation_data = pyed.getContours()
+        self.segmentation_seeds = pyed.getSeeds()
         self.checkSegData()
 
     def manualSeg(self): 
@@ -385,7 +386,7 @@ class MainWindow(QMainWindow):
                             voxelVolume=self.voxel_volume)
         pyed.exec_()
 
-        self.segmentation_data = pyed.getSeeds().nonzero()
+        self.segmentation_data = pyed.getSeeds()
         self.checkSegData()
 
     def saveSeg(self, event=None, filename=None):
@@ -394,9 +395,13 @@ class MainWindow(QMainWindow):
                 filename = str(QFileDialog.getSaveFileName(self, 'Save SEG file'))
 
             if len(filename) > 0:
-                savemat(filename, {'data': self.segmentation_data,
-                                   'voxelsizemm': self.dcm_metadata['voxelsizemm']})
-                self.setLabelText(self.text_dcm_data, filename)
+                outdata = {'segdata': self.segmentation_data,
+                            'voxelsizemm': self.voxel_sizemm}
+                if self.segmentation_seeds is not None:
+                    outdata['segseeds'] = self.segmentation_seeds
+
+                savemat(filename, outdata)
+                self.setLabelText(self.text_seg_out, filename)
                 self.statusBar().showMessage('Ready')
 
             else:
@@ -411,9 +416,15 @@ class MainWindow(QMainWindow):
 
         if len(filename) > 0:
             data = loadmat(filename,
-                           variable_names=['segdata', 'voxelsizemm'])
-            
-            self.segmentation_data = data['data']
+                           variable_names=['segdata', 'segseeds', 'voxelsizemm'])
+
+            self.segmentation_data = data['segdata']
+            if 'segseeds' in data:
+                self.segmentation_seeds = data['segseeds']
+
+            else:
+                self.segmentation_seeds = None
+
             self.voxel_sizemm = data['voxelsizemm']
             self.setVoxelVolume(self.voxel_sizemm.reshape((3,)))
             self.setLabelText(self.text_mesh_in, filename)
