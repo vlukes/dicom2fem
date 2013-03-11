@@ -25,10 +25,17 @@ sys.path.append("./pyseg_base/src/")
 
 import dcmreaddata as dcmreader
 from seed_editor_qt import QTSeedEditor
-import seg2fem
 import pycat
-from meshio import supported_capabilities, supported_formats
-            
+from meshio import supported_capabilities, supported_formats, MeshIO
+
+from viewer import QVTKViewer
+
+inv_supported_formats = dict(zip(supported_formats.values(), supported_formats.keys()))
+smooth_methods = ['marching cubes', 'taubin']
+
+elem_tab = {'2_3': 'triangles', '3_4': 'tetrahedrons',
+            '2_4': 'quads', '3_8': 'hexahedrons'}
+
 class MainWindow(QMainWindow):
     
     def __init__(self, dcmdir=None):
@@ -43,7 +50,8 @@ class MainWindow(QMainWindow):
         self.segmentation_seeds = None
         self.segmentation_data = None
         self.mesh_data = None
-
+        self.mesh_out_format = 'vtk'
+        self.mesh_smooth_method = smooth_methods[0]
         self.initUI()
         
     def initUI(self):               
@@ -134,14 +142,17 @@ class MainWindow(QMainWindow):
         btn_meshsave = QPushButton("Save MESH", self)
         btn_meshsave.clicked.connect(self.saveMesh)
         btn_meshgener = QPushButton("Generate", self)
-        btn_meshsave.clicked.connect(self.generMesh)
+        btn_meshgener.clicked.connect(self.generMesh)
+        btn_meshsmooth = QPushButton("Smooth", self)
+        btn_meshsmooth.clicked.connect(self.smoothMesh)
         btn_meshview = QPushButton("View", self)
         btn_meshview.clicked.connect(self.viewMesh)
         grid.addWidget(btn_meshload, rstart + 4, 1)
         grid.addWidget(btn_meshgener, rstart + 4, 2)
-        grid.addWidget(btn_meshview, rstart + 4, 3)
+        grid.addWidget(btn_meshsmooth, rstart + 4, 3)
         grid.addWidget(btn_meshsave, rstart + 4, 4)
-
+        grid.addWidget(btn_meshview, rstart + 8, 3, 1, 2)
+        
         text_mesh_mesh = QLabel('mesh:')
         text_mesh_elements = QLabel('elements:')
         text_mesh_smooth = QLabel('smooth method:')
@@ -155,18 +166,18 @@ class MainWindow(QMainWindow):
         rbtn_mesh_mesh_vol = QRadioButton('volume')
         grid.addWidget(rbtn_mesh_mesh_surf, rstart + 7, 1)
         grid.addWidget(rbtn_mesh_mesh_vol, rstart + 8, 1)
-        rbtng_mesh_mesh = QButtonGroup(self)
-        rbtng_mesh_mesh.addButton(rbtn_mesh_mesh_surf, 1)
-        rbtng_mesh_mesh.addButton(rbtn_mesh_mesh_vol, 2)
+        self.rbtng_mesh_mesh = QButtonGroup(self)
+        self.rbtng_mesh_mesh.addButton(rbtn_mesh_mesh_surf, 1)
+        self.rbtng_mesh_mesh.addButton(rbtn_mesh_mesh_vol, 2)
         rbtn_mesh_mesh_vol.setChecked(True)
 
         rbtn_mesh_elements_3 = QRadioButton('tri/tetra')
         rbtn_mesh_elements_4 = QRadioButton('quad/hexa')
         grid.addWidget(rbtn_mesh_elements_3, rstart + 7, 2)
         grid.addWidget(rbtn_mesh_elements_4, rstart + 8, 2)
-        rbtng_mesh_elements = QButtonGroup(self)
-        rbtng_mesh_elements.addButton(rbtn_mesh_elements_3, 1)
-        rbtng_mesh_elements.addButton(rbtn_mesh_elements_4, 2)
+        self.rbtng_mesh_elements = QButtonGroup(self)
+        self.rbtng_mesh_elements.addButton(rbtn_mesh_elements_3, 1)
+        self.rbtng_mesh_elements.addButton(rbtn_mesh_elements_4, 2)
         rbtn_mesh_elements_4.setChecked(True)
         
         combo = QComboBox(self)
@@ -183,9 +194,8 @@ class MainWindow(QMainWindow):
 
         combo2 = QComboBox(self)
         combo2.activated[str].connect(self.changeSmoothMethod)
-        smooth_funs = seg2fem.smooth_methods.keys()
-        combo2.addItems(smooth_funs)
-        combo2.setCurrentIndex(smooth_funs.index('none'))
+        combo2.addItems(smooth_methods)
+        combo2.setCurrentIndex(smooth_methods.index(self.mesh_smooth_method))
         grid.addWidget(combo2, rstart + 7, 3)
 
         hr = QFrame()
@@ -282,7 +292,7 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage('No DICOM data!')
             return
 
-        pyed = seededitor.QTSeedEditor(self.dcm_3Ddata, mode='crop')
+        pyed = QTSeedEditor(self.dcm_3Ddata, mode='crop')
         pyed.exec_()
         nzs = pyed.getSeeds().nonzero()
 
@@ -314,7 +324,8 @@ class MainWindow(QMainWindow):
     def saveMat(self, event=None, filename=None):
         if self.dcm_3Ddata is not None:
             if filename is None:
-                filename = str(QFileDialog.getSaveFileName(self, 'Save MAT file'))
+                filename = str(QFileDialog.getSaveFileName(self, 'Save MAT file',
+                                                           filter='Files (*.mat)'))
 
             if len(filename) > 0:
                 savemat(filename, {'data': self.dcm_3Ddata,
@@ -330,7 +341,8 @@ class MainWindow(QMainWindow):
 
     def loadMat(self, event=None, filename=None):
         if filename is None:
-            filename = str(QFileDialog.getOpenFileName(self, 'Load MAT file'))
+            filename = str(QFileDialog.getOpenFileName(self, 'Load MAT file',
+                                                       filter='Files (*.mat)'))
 
         if len(filename) > 0:
             data = loadmat(filename,
@@ -346,6 +358,10 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage('No input file specified!')
             
     def checkSegData(self):
+        if self.segmentation_data is None:
+            self.statusBar().showMessage('No SEG data!')
+            return
+
         nzs = self.segmentation_data.nonzero()
         nn = nzs[0].shape[0]
         if nn > 0:
@@ -392,7 +408,8 @@ class MainWindow(QMainWindow):
     def saveSeg(self, event=None, filename=None):
         if self.segmentation_data is not None:
             if filename is None:
-                filename = str(QFileDialog.getSaveFileName(self, 'Save SEG file'))
+                filename = str(QFileDialog.getSaveFileName(self, 'Save SEG file',
+                                                           filter='Files (*.mat)'))
 
             if len(filename) > 0:
                 outdata = {'segdata': self.segmentation_data,
@@ -412,7 +429,8 @@ class MainWindow(QMainWindow):
 
     def loadSeg(self, event=None, filename=None):
         if filename is None:
-            filename = str(QFileDialog.getOpenFileName(self, 'Load SEG file'))
+            filename = str(QFileDialog.getOpenFileName(self, 'Load SEG file',
+                                                       filter='Files (*.mat)'))
 
         if len(filename) > 0:
             data = loadmat(filename,
@@ -436,11 +454,14 @@ class MainWindow(QMainWindow):
     def saveMesh(self, event=None, filename=None):
         if self.mesh_data is not None:
             if filename is None:
-                filename = str(QFileDialog.getSaveFileName(self, 'Save MESH file'))
+                file_ext = inv_supported_formats[self.mesh_out_format]
+                filename = str(QFileDialog.getSaveFileName(self, 'Save MESH file',
+                                                           filter='Files (*%s)' % file_ext))
 
             if len(filename) > 0:
-                # savemat(filename, {'segdata': self.segmentation_data,
-                #                    'voxelsizemm': self.voxel_sizemm})
+                io = MeshIO.for_format(filename, format=self.mesh_out_format, writable=True)
+                io.write(filename, self.mesh_data)
+
                 self.setLabelText(self.text_mesh_out, filename)
                 self.statusBar().showMessage('Ready')
             
@@ -451,16 +472,62 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage('No mesh data!')
 
     def generMesh(self):
-        pass
+        from seg2fem import gen_mesh_from_voxels
 
+        etab = {1: 't', 2: 'q'}
+        mtab = {1: 's', 2: 'v'}
+
+        eid = self.rbtng_mesh_elements.checkedId()
+        mid = self.rbtng_mesh_mesh.checkedId()
+        self.statusBar().showMessage('Generating mesh...')
+        QApplication.processEvents()
+        
+        self.mesh_data = gen_mesh_from_voxels(self.segmentation_data,
+                                              self.voxel_sizemm * 1e-3,
+                                              etype=etab[eid],
+                                              mtype=mtab[mid])
+
+        self.setLabelText(self.text_mesh_data, '%d %s'\
+                          % (self.mesh_data.n_el,
+                             elem_tab[self.mesh_data.descs[0]]))
+
+        self.statusBar().showMessage('Ready')
+
+    def smoothMesh(self):
+        from seg2fem import gen_mesh_from_voxels_mc, smooth_mesh
+
+        self.statusBar().showMessage('Smoothing mesh...')
+        QApplication.processEvents()
+
+        if self.mesh_smooth_method == 'marching cubes':
+            self.mesh_data = gen_mesh_from_voxels_mc(self.segmentation_data,
+                                                     self.voxel_sizemm * 1e-3)
+
+        elif self.mesh_smooth_method == 'taubin':
+            mesh.coors = smooth_mesh(self.mesh_data, n_iter=4, lam=0.6307, mu=-0.6347,
+                                     volume_corr=True)
+            
+        self.setLabelText(self.text_mesh_data, '%d %s'\
+                          % (self.mesh_data.n_el,
+                             elem_tab[self.mesh_data.descs[0]]))
+
+        self.statusBar().showMessage('Ready')
+    
     def viewMesh(self):
-        pass
+        if self.mesh_data is not None:
+            vtk_file = 'mesh_geom.vtk'
+            self.mesh_data.write(vtk_file)
+            view = QVTKViewer(vtk_file)
+            view.exec_()
 
-    def changeOut(self, event):
-        pass
+        else:
+            self.statusBar().showMessage('No mesh data!')
 
-    def changeSmoothMethod(self, event):
-        pass
+    def changeOut(self, val):
+        self.mesh_out_format = str(val)
+
+    def changeSmoothMethod(self, val):
+        self.mesh_smooth_method = str(val)
 
 usage = '%prog [options]\n' + __doc__.rstrip()
 help = {
