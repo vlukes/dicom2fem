@@ -1,11 +1,12 @@
 Installation Instructions
 -------------------------
 
-Follow the instructions is pyseg_base/INSTALL.
-
 Install DICOM2FEM:
 
-  git clone https://github.com/vlukes/dicom2fem.git
+  git clone --recursive git@github.com:vlukes/dicom2fem.git
+
+
+Follow the instructions in pyseg_base/INSTALL.
 
 
 Sample DICOM data can be found at:
