@@ -8,10 +8,15 @@ Example:
 $ seg2fem.py -f brain_seg.mat
 """
 
+from optparse import OptionParser
+from scipy.io import loadmat
 import scipy.sparse as sps
 import numpy as nm
 from numpy.core import intc
 from numpy.linalg import lapack_lite
+from mesh import Mesh
+from marching_cubes import marching_cubes
+from genfem_base import set_nodemtx
 
 # compatibility
 try:
@@ -230,7 +235,7 @@ def smooth_mesh(mesh, n_iter=4, lam=0.6307, mu=-0.6347,
 
     return coors
 
-def gen_mesh_from_voxels(voxels, dims, etype='q'):
+def gen_mesh_from_voxels(voxels, dims, etype='q', mtype='v'):
     """
     Generate FE mesh from voxels (volumetric data).
 
@@ -252,107 +257,192 @@ def gen_mesh_from_voxels(voxels, dims, etype='q'):
     dims = dims.squeeze()
     dim = len(dims)
     nddims = nm.array(voxels.shape) + 2
-
-    nodemtx = nm.zeros(nddims, dtype=nm.int32)
-
-    if dim == 2:
-        #iy, ix = nm.where(voxels.transpose())
-        iy, ix = nm.where(voxels)
-        nel = ix.shape[0]
-
-        if etype == 'q':
-            nodemtx[ix,iy] += 1
-            nodemtx[ix + 1,iy] += 1
-            nodemtx[ix + 1,iy + 1] += 1
-            nodemtx[ix,iy + 1] += 1
-
-        elif etype == 't':
-            nodemtx[ix,iy] += 2
-            nodemtx[ix + 1,iy] += 1
-            nodemtx[ix + 1,iy + 1] += 2
-            nodemtx[ix,iy + 1] += 1
-            nel *= 2
-
-    elif dim == 3:
-        #iy, ix, iz = nm.where(voxels.transpose(1, 0, 2))
-        iy, ix, iz = nm.where(voxels)
-        nel = ix.shape[0]
-
-        if etype == 'q':
-            nodemtx[ix,iy,iz] += 1
-            nodemtx[ix + 1,iy,iz] += 1
-            nodemtx[ix + 1,iy + 1,iz] += 1
-            nodemtx[ix,iy + 1,iz] += 1
-            nodemtx[ix,iy,iz + 1] += 1
-            nodemtx[ix + 1,iy,iz + 1] += 1
-            nodemtx[ix + 1,iy + 1,iz + 1] += 1
-            nodemtx[ix,iy + 1,iz + 1] += 1
-
-        elif etype == 't':
-            nodemtx[ix,iy,iz] += 6
-            nodemtx[ix + 1,iy,iz] += 2
-            nodemtx[ix + 1,iy + 1,iz] += 2
-            nodemtx[ix,iy + 1,iz] += 2
-            nodemtx[ix,iy,iz + 1] += 2
-            nodemtx[ix + 1,iy,iz + 1] += 2
-            nodemtx[ix + 1,iy + 1,iz + 1] += 6
-            nodemtx[ix,iy + 1,iz + 1] += 2
-            nel *= 6
-
-    else:
-        msg = 'incorrect voxel dimension! (%d)' % dim
-        raise ValueError(msg)
-
+    
+    nodemtx = nm.zeros(nddims, dtype=nm.int8)
+    vxidxs = nm.where(voxels)
+    set_nodemtx(nodemtx, vxidxs, etype)
+    
     ndidx = nm.where(nodemtx)
+    del(nodemtx)
+    
     coors = nm.array(ndidx).transpose() * dims
     nnod = coors.shape[0]
 
     nodeid = -nm.ones(nddims, dtype=nm.int32)
     nodeid[ndidx] = nm.arange(nnod)
 
+    if mtype == 's':
+        felems = []
+        nn = nm.zeros(nddims, dtype=nm.int8)
+
     # generate elements
     if dim == 2:
-        elems = nm.array([nodeid[ix,iy],
-                          nodeid[ix + 1,iy],
-                          nodeid[ix + 1,iy + 1],
-                          nodeid[ix,iy + 1]]).transpose()
+        ix, iy = vxidxs
+
+        if mtype == 'v':
+            elems = nm.array([nodeid[ix,iy],
+                              nodeid[ix + 1,iy],
+                              nodeid[ix + 1,iy + 1],
+                              nodeid[ix,iy + 1]]).transpose()
+            nnd = 4
+            edim = 2
+
+        else:
+            fc = nm.zeros(nddims + (2,), dtype=nm.int32)
+
+            # x
+            fc[ix,iy,:] = nm.array([nodeid[ix,iy + 1], nodeid[ix,iy]]).transpose()
+            fc[ix + 1,iy,:] = nm.array([nodeid[ix + 1,iy], nodeid[ix + 1,iy + 1]]).transpose()
+            nn[ix,iy] = 1
+            nn[ix + 1,iy] += 1
+
+            idx = nm.where(nn == 1)
+            felems.append(fc[idx])
+
+            # y
+            fc.fill(0)
+            nn.fill(0)
+            fc[ix,iy,:] = nm.array([nodeid[ix,iy], nodeid[ix + 1,iy]]).transpose()
+            fc[ix,iy + 1,:] = nm.array([nodeid[ix + 1,iy + 1], nodeid[ix,iy + 1]]).transpose()
+            nn[ix,iy] = 1
+            nn[ix,iy + 1] += 1
+            
+            idx = nm.where(nn == 1)
+            felems.append(fc[idx])
+
+            elems = nm.concatenate(felems)
+
+            nnd = 2
+            edim = 1
 
     elif dim == 3:
-        elems = nm.array([nodeid[ix,iy,iz],
-                          nodeid[ix + 1,iy,iz],
-                          nodeid[ix + 1,iy + 1,iz],
-                          nodeid[ix,iy + 1,iz],
-                          nodeid[ix,iy,iz + 1],
-                          nodeid[ix + 1,iy,iz + 1],
-                          nodeid[ix + 1,iy + 1,iz + 1],
-                          nodeid[ix,iy + 1,iz + 1]]).transpose()
+        ix, iy, iz = vxidxs
+
+        if mtype == 'v':
+            elems = nm.array([nodeid[ix,iy,iz],
+                              nodeid[ix + 1,iy,iz],
+                              nodeid[ix + 1,iy + 1,iz],
+                              nodeid[ix,iy + 1,iz],
+                              nodeid[ix,iy,iz + 1],
+                              nodeid[ix + 1,iy,iz + 1],
+                              nodeid[ix + 1,iy + 1,iz + 1],
+                              nodeid[ix,iy + 1,iz + 1]]).transpose()
+            nnd = 8
+            edim = 3
+
+        else:
+            fc = nm.zeros(tuple(nddims) + (4,), dtype=nm.int32)
+
+            # x
+            fc[ix,iy,iz,:] = nm.array([nodeid[ix,iy,iz], nodeid[ix,iy,iz + 1],\
+                                       nodeid[ix,iy + 1,iz + 1], nodeid[ix,iy + 1,iz]]).transpose()
+            fc[ix + 1,iy,iz,:] = nm.array([nodeid[ix + 1,iy,iz], nodeid[ix + 1,iy + 1,iz],\
+                                           nodeid[ix + 1,iy + 1,iz + 1], nodeid[ix + 1,iy,iz + 1]]).transpose()
+            nn[ix,iy,iz] = 1
+            nn[ix + 1,iy,iz] += 1
+
+            idx = nm.where(nn == 1)
+            felems.append(fc[idx])
+
+            # y
+            fc.fill(0)
+            nn.fill(0)
+            fc[ix,iy,iz,:] = nm.array([nodeid[ix,iy,iz], nodeid[ix + 1,iy,iz],\
+                                       nodeid[ix + 1,iy,iz + 1], nodeid[ix,iy,iz + 1]]).transpose()
+            fc[ix,iy + 1,iz,:] = nm.array([nodeid[ix,iy + 1,iz], nodeid[ix,iy + 1,iz + 1],\
+                                           nodeid[ix + 1,iy + 1,iz + 1], nodeid[ix + 1,iy + 1,iz]]).transpose()
+            nn[ix,iy,iz] = 1
+            nn[ix,iy + 1,iz] += 1
+
+            idx = nm.where(nn == 1)
+            felems.append(fc[idx])
+        
+            # z
+            fc.fill(0)
+            nn.fill(0)
+            fc[ix,iy,iz,:] = nm.array([nodeid[ix,iy,iz], nodeid[ix,iy + 1,iz],\
+                                       nodeid[ix + 1,iy + 1,iz], nodeid[ix + 1,iy,iz]]).transpose()
+            fc[ix,iy,iz + 1,:] = nm.array([nodeid[ix,iy,iz + 1], nodeid[ix + 1,iy,iz + 1],\
+                                           nodeid[ix + 1,iy + 1,iz + 1], nodeid[ix,iy + 1,iz + 1]]).transpose()
+            nn[ix,iy,iz] = 1
+            nn[ix,iy,iz + 1] += 1
+            
+            idx = nm.where(nn == 1)
+            felems.append(fc[idx])
+
+            elems = nm.concatenate(felems)
+
+            nnd = 4
+            edim = 2
+
+    # reduce inner nodes
+    if mtype == 's':
+        aux = nm.zeros((nnod,), dtype=nm.int32)
+
+        for ii in elems.T:
+            aux[ii] = 1
+
+        idx = nm.where(aux)
+
+        aux.fill(0)
+        nnod = idx[0].shape[0]
+        
+        aux[idx] = range(nnod)
+        coors = coors[idx]
+        
+        for ii in range(nnd):
+            elems[:,ii] = aux[elems[:,ii]]
 
     if etype == 't':
         elems = elems_q2t(elems)
 
-    eid = etype + str(dim)
-    eltab = {'q2': 4, 'q3': 8, 't2': 3, 't3': 4}
+    nel = elems.shape[0]
 
     mesh = Mesh.from_data('voxel_data',
                           coors, nm.ones((nnod,), dtype=nm.int32),
                           {0: nm.ascontiguousarray(elems)},
                           {0: nm.ones((nel,), dtype=nm.int32)},
-                          {0: '%d_%d' % (dim, eltab[eid])})
+                          {0: '%d_%d' % (edim, nnd)})
 
     return mesh
 
-smooth_methods = {
-    'none': None,
-    'taubin': smooth_mesh,
-    }
+def gen_mesh_from_voxels_mc(voxels, voxelsizemm):
+    import scipy.spatial as scsp
+
+    tri = marching_cubes(voxels, voxelsizemm * 1e-3)
+    
+    nel, nnd, dim = tri.shape
+    coors = tri.reshape((nel * nnd, dim))
+    tree = scsp.ckdtree.cKDTree(coors)
+    eps = nm.max(coors.max(axis=0) - coors.min(axis=0)) *1e-6
+    dist, idx = tree.query(coors, k=24, distance_upper_bound=eps)
+
+    uniq = set([])    
+    for ii in idx:
+        ukey = ii[ii < tree.n]
+        ukey.sort()
+        uniq.add(tuple(ukey))
+
+    ntri = nm.ones((nel * nnd,), dtype=nm.int32)
+    nnod = len(uniq)
+    ncoors = nm.zeros((nnod, 3), dtype=nm.float64)
+
+    for ii, idxs in enumerate(uniq):
+        ntri[nm.array(idxs)] = ii
+        ncoors[ii] = coors[idxs[0]]
+
+    mesh = Mesh.from_data('voxel_mc_data',
+                          ncoors, nm.ones((nnod,), dtype=nm.int32),
+                          {0: nm.ascontiguousarray(ntri.reshape((nel, nnd)))},
+                          {0: nm.ones((nel,), dtype=nm.int32)},
+                          {0: '%d_%d' % (2, 3)})
+
+    return mesh
 
 usage = '%prog [options]\n' + __doc__.rstrip()
 help = {
-    'in_file': 'input *.mat file with "data" field',
-    'mode': '"seed" or "crop" mode',
-    #'out_file': 'store the output matrix to the file',
-    #'debug': 'run in debug mode',
-    'test': 'run unit test',
+    'in_file': 'input *.mat file with segmented data',
+    'out_file': 'output mesh file',
 }
 
 def main():
@@ -360,35 +450,24 @@ def main():
     parser.add_option('-f','--filename', action='store',
                       dest='in_filename', default=None,
                       help=help['in_file'])
-    # parser.add_option('-d', '--debug', action='store_true',
-    #                   dest='debug', help=help['debug'])
-    parser.add_option('-m', '--mode', action='store',
-                      dest='mode', default='seed', help=help['mode'])
-    parser.add_option('-t', '--tests', action='store_true',
-                      dest='unit_test', help=help['test'])
-    # parser.add_option('-o', '--outputfile', action='store',
-    #                   dest='out_filename', default='output.mat',
-    #                   help=help['out_file'])
+    parser.add_option('-o', '--outputfile', action='store',
+                      dest='out_filename', default='output.vtk',
+                      help=help['out_file'])
     (options, args) = parser.parse_args()
-
-    # if options.tests:
-    #     # hack for use argparse and unittest in one module
-    #     sys.argv[1:]=[]
-    #     unittest.main()
-    #gen_mesh_from_voxels(voxels, dims, etype='q'):
 
     if options.in_filename is None:
         raise IOError('No input data!')
 
     else:
         dataraw = loadmat(options.in_filename,
-                          variable_names=['data', 'voxelsizemm'])
-        
-    app = QApplication(sys.argv)
-    pyed = QTSeedEditor(dataraw['data'],
-                        mode=options.mode,
-                        voxelVolume=np.prod(dataraw['voxelsizemm']))
-    sys.exit(app.exec_())
+                          variable_names=['segdata', 'voxelsizemm'])
+
+    mesh = gen_mesh_from_voxels_mc(dataraw['segdata'], dataraw['voxelsizemm'])
+    
+    #mesh = gen_mesh_from_voxels(dataraw['segdata'], dataraw['voxelsizemm'],
+    #                            etype='q', mtype='s')
+
+    mesh.write(options.out_filename)
 
 if __name__ == "__main__":
     main()
