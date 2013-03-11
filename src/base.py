@@ -31,70 +31,70 @@ if sys.version[0] < '3':
 else:
     basestr = str
 
-# def get_debug():
-#     """
-#     Utility function providing ``debug()`` function.
-#     """
-#     try:
-#         import IPython
+def get_debug():
+    """
+    Utility function providing ``debug()`` function.
+    """
+    try:
+        import IPython
 
-#     except ImportError:
-#         debug = None
+    except ImportError:
+        debug = None
 
-#     else:
-#         old_excepthook = sys.excepthook
+    else:
+        old_excepthook = sys.excepthook
 
-#         def debug(frame=None):
-#             if IPython.__version__ >= '0.11':
-#                 from IPython.core.debugger import Pdb
+        def debug(frame=None):
+            if IPython.__version__ >= '0.11':
+                from IPython.core.debugger import Pdb
 
-#                 try:
-#                     ip = get_ipython()
+                try:
+                    ip = get_ipython()
 
-#                 except NameError:
-#                     from IPython.frontend.terminal.embed \
-#                          import InteractiveShellEmbed
-#                     ip = InteractiveShellEmbed()
+                except NameError:
+                    from IPython.frontend.terminal.embed \
+                         import InteractiveShellEmbed
+                    ip = InteractiveShellEmbed()
 
-#                 colors = ip.colors
+                colors = ip.colors
 
-#             else:
-#                 from IPython.Debugger import Pdb
-#                 from IPython.Shell import IPShell
-#                 from IPython import ipapi
+            else:
+                from IPython.Debugger import Pdb
+                from IPython.Shell import IPShell
+                from IPython import ipapi
 
-#                 ip = ipapi.get()
-#                 if ip is None:
-#                     IPShell(argv=[''])
-#                     ip = ipapi.get()
+                ip = ipapi.get()
+                if ip is None:
+                    IPShell(argv=[''])
+                    ip = ipapi.get()
 
-#                 colors = ip.options.colors
+                colors = ip.options.colors
 
-#             sys.excepthook = old_excepthook
+            sys.excepthook = old_excepthook
 
-#             if frame is None:
-#                 frame = sys._getframe().f_back
+            if frame is None:
+                frame = sys._getframe().f_back
 
-#             Pdb(colors).set_trace(frame)
+            Pdb(colors).set_trace(frame)
 
-#     if debug is None:
-#         import pdb
-#         debug = pdb.set_trace
+    if debug is None:
+        import pdb
+        debug = pdb.set_trace
 
-#     debug.__doc__ = """
-#     Start debugger on line where it is called, roughly equivalent to::
+    debug.__doc__ = """
+    Start debugger on line where it is called, roughly equivalent to::
 
-#         import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
 
-#     First, this function tries to start an `IPython`-enabled
-#     debugger using the `IPython` API.
+    First, this function tries to start an `IPython`-enabled
+    debugger using the `IPython` API.
 
-#     When this fails, the plain old `pdb` is used instead.
-#     """
+    When this fails, the plain old `pdb` is used instead.
+    """
 
-#     return debug
+    return debug
 
-# debug = get_debug()
+debug = get_debug()
 
 def mark_time(times, msg=None):
     """
