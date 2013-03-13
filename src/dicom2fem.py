@@ -231,6 +231,8 @@ class MainWindow(QMainWindow):
         if self.dcmdir is None:
             self.dcmdir = dcmreader.get_dcmdir_qt(app=True)
 
+        self.statusBar().showMessage('Reading DICOM directory...')
+
         if self.dcmdir is not None:
             dcr = dcmreader.DicomReader(os.path.abspath(self.dcmdir))
 
@@ -326,8 +328,9 @@ class MainWindow(QMainWindow):
             if filename is None:
                 filename = str(QFileDialog.getSaveFileName(self, 'Save MAT file',
                                                            filter='Files (*.mat)'))
-
             if len(filename) > 0:
+                self.statusBar().showMessage('Writing DICOM data...')
+
                 savemat(filename, {'data': self.dcm_3Ddata,
                                    'voxelsizemm': self.voxel_sizemm})
                 self.setLabelText(self.text_dcm_out, filename)
@@ -345,6 +348,8 @@ class MainWindow(QMainWindow):
                                                        filter='Files (*.mat)'))
 
         if len(filename) > 0:
+            self.statusBar().showMessage('Reading DICOM data...')
+
             data = loadmat(filename,
                            variable_names=['data', 'voxelsizemm'])
             
@@ -412,6 +417,8 @@ class MainWindow(QMainWindow):
                                                            filter='Files (*.mat)'))
 
             if len(filename) > 0:
+                self.statusBar().showMessage('Writing segmentation data...')
+
                 outdata = {'segdata': self.segmentation_data,
                             'voxelsizemm': self.voxel_sizemm}
                 if self.segmentation_seeds is not None:
@@ -433,6 +440,8 @@ class MainWindow(QMainWindow):
                                                        filter='Files (*.mat)'))
 
         if len(filename) > 0:
+            self.statusBar().showMessage('Reading segmentation data...')
+
             data = loadmat(filename,
                            variable_names=['segdata', 'segseeds', 'voxelsizemm'])
 
@@ -459,6 +468,8 @@ class MainWindow(QMainWindow):
                                                            filter='Files (*%s)' % file_ext))
 
             if len(filename) > 0:
+                self.statusBar().showMessage('Writing mesh...')
+
                 io = MeshIO.for_format(filename, format=self.mesh_out_format, writable=True)
                 io.write(filename, self.mesh_data)
 
