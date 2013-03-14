@@ -80,12 +80,12 @@ class MainWindow(QMainWindow):
         grid.addWidget(self.text_dcm_out, rstart + 3, 1, 1, 4)
 
         btn_dcmdir = QPushButton("Load DICOM", self)
-        btn_dcmdir.clicked.connect(self.loadDcm)
+        btn_dcmdir.clicked.connect(self.loadDcmDir)
         btn_dcmred = QPushButton("Reduce", self)
         btn_dcmred.clicked.connect(self.reduceDcm)
         btn_dcmcrop = QPushButton("Crop", self)
         btn_dcmcrop.clicked.connect(self.cropDcm)
-        btn_dcmsave = QPushButton("Save MAT", self)
+        btn_dcmsave = QPushButton("Save DCM", self)
         btn_dcmsave.clicked.connect(self.saveMat)
         grid.addWidget(btn_dcmdir, rstart + 4, 1)
         grid.addWidget(btn_dcmred, rstart + 4, 2)
@@ -108,8 +108,8 @@ class MainWindow(QMainWindow):
         grid.addWidget(self.text_seg_data, rstart + 2, 1, 1, 4)
         grid.addWidget(self.text_seg_out, rstart + 3, 1, 1, 4)
 
-        btn_segload = QPushButton("Load MAT", self)
-        btn_segload.clicked.connect(self.loadMat)
+        btn_segload = QPushButton("Load DCM", self)
+        btn_segload.clicked.connect(self.loadDcm)
         btn_segauto = QPushButton("Automatic seg.", self)
         btn_segauto.clicked.connect(self.autoSeg)
         btn_segman = QPushButton("Manual seg.", self)
@@ -227,7 +227,7 @@ class MainWindow(QMainWindow):
     def setVoxelVolume(self, vxs):
         self.voxel_volume = np.prod(vxs)
 
-    def loadDcm(self):
+    def loadDcmDir(self):
         if self.dcmdir is None:
             self.dcmdir = dcmreader.get_dcmdir_qt(app=True)
 
@@ -326,10 +326,10 @@ class MainWindow(QMainWindow):
     def saveMat(self, event=None, filename=None):
         if self.dcm_3Ddata is not None:
             if filename is None:
-                filename = str(QFileDialog.getSaveFileName(self, 'Save MAT file',
-                                                           filter='Files (*.mat)'))
+                filename = str(QFileDialog.getSaveFileName(self, 'Save DCM file',
+                                                           filter='Files (*.dcm)'))
             if len(filename) > 0:
-                self.statusBar().showMessage('Writing DICOM data...')
+                self.statusBar().showMessage('Saving DICOM data...')
 
                 savemat(filename, {'data': self.dcm_3Ddata,
                                    'voxelsizemm': self.voxel_sizemm})
@@ -342,13 +342,13 @@ class MainWindow(QMainWindow):
         else:
             self.statusBar().showMessage('No DICOM data!')      
 
-    def loadMat(self, event=None, filename=None):
+    def loadDcm(self, event=None, filename=None):
         if filename is None:
-            filename = str(QFileDialog.getOpenFileName(self, 'Load MAT file',
-                                                       filter='Files (*.mat)'))
+            filename = str(QFileDialog.getOpenFileName(self, 'Load DCM file',
+                                                       filter='Files (*.dcm)'))
 
         if len(filename) > 0:
-            self.statusBar().showMessage('Reading DICOM data...')
+            self.statusBar().showMessage('Loading DICOM data...')
 
             data = loadmat(filename,
                            variable_names=['data', 'voxelsizemm'])
@@ -414,10 +414,10 @@ class MainWindow(QMainWindow):
         if self.segmentation_data is not None:
             if filename is None:
                 filename = str(QFileDialog.getSaveFileName(self, 'Save SEG file',
-                                                           filter='Files (*.mat)'))
+                                                           filter='Files (*.seg)'))
 
             if len(filename) > 0:
-                self.statusBar().showMessage('Writing segmentation data...')
+                self.statusBar().showMessage('Saving segmentation data...')
 
                 outdata = {'segdata': self.segmentation_data,
                             'voxelsizemm': self.voxel_sizemm}
@@ -437,10 +437,10 @@ class MainWindow(QMainWindow):
     def loadSeg(self, event=None, filename=None):
         if filename is None:
             filename = str(QFileDialog.getOpenFileName(self, 'Load SEG file',
-                                                       filter='Files (*.mat)'))
+                                                       filter='Files (*.seg)'))
 
         if len(filename) > 0:
-            self.statusBar().showMessage('Reading segmentation data...')
+            self.statusBar().showMessage('Loading segmentation data...')
 
             data = loadmat(filename,
                            variable_names=['segdata', 'segseeds', 'voxelsizemm'])
@@ -468,7 +468,7 @@ class MainWindow(QMainWindow):
                                                            filter='Files (*%s)' % file_ext))
 
             if len(filename) > 0:
-                self.statusBar().showMessage('Writing mesh...')
+                self.statusBar().showMessage('Saving mesh...')
 
                 io = MeshIO.for_format(filename, format=self.mesh_out_format, writable=True)
                 io.write(filename, self.mesh_data)
@@ -515,12 +515,21 @@ class MainWindow(QMainWindow):
                                                      self.voxel_sizemm * 1e-3)
 
         elif self.mesh_smooth_method == 'taubin':
-            mesh.coors = smooth_mesh(self.mesh_data, n_iter=4, lam=0.6307, mu=-0.6347,
-                                     volume_corr=True)
+            mid = self.rbtng_mesh_mesh.checkedId()
+            if mid == 'v':
+                 volume_corr=True
+
+            else:
+                volume_corr=False
+
+            self.mesh_data.coors = smooth_mesh(self.mesh_data,
+                                               n_iter=10, lam=0.6307, mu=-0.6347,
+                                               volume_corr=volume_corr)
             
-        self.setLabelText(self.text_mesh_data, '%d %s'\
+        self.setLabelText(self.text_mesh_data, '%d %s, smooth method - %s'\
                           % (self.mesh_data.n_el,
-                             elem_tab[self.mesh_data.descs[0]]))
+                             elem_tab[self.mesh_data.descs[0]],
+                              self.mesh_smooth_method))
 
         self.statusBar().showMessage('Ready')
     
@@ -543,7 +552,7 @@ class MainWindow(QMainWindow):
 usage = '%prog [options]\n' + __doc__.rstrip()
 help = {
     'dcm_dir': 'DICOM data direcotory',
-    'mat_file': 'MAT file with DICOM data',
+    'dcm_file': 'DCM file with DICOM data',
     'seg_file': 'file with segmented data',
 }
 
@@ -552,9 +561,9 @@ def main():
     parser.add_option('-d','--dcmdir', action='store',
                       dest='dcmdir', default=None,
                       help=help['dcm_dir'])
-    parser.add_option('-m','--matfile', action='store',
-                      dest='matfile', default=None,
-                      help=help['mat_file'])
+    parser.add_option('-m','--dcmfile', action='store',
+                      dest='dcmfile', default=None,
+                      help=help['dcm_file'])
     parser.add_option('-s','--segfile', action='store',
                       dest='segfile', default=None,
                       help=help['seg_file'])
@@ -565,10 +574,10 @@ def main():
     mw = MainWindow(dcmdir=options.dcmdir)
 
     if options.dcmdir is not None:
-        mw.loadDcm()
+        mw.loadDcmDir()
 
-    if options.matfile is not None:
-        mw.loadMat(filename=options.matfile)
+    if options.dcmfile is not None:
+        mw.loadDcm(filename=options.dcmfile)
 
     if options.segfile is not None:
         mw.loadSeg(filename=options.segfile)
