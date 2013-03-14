@@ -16,7 +16,7 @@ from numpy.core import intc
 from numpy.linalg import lapack_lite
 from mesh import Mesh
 from marching_cubes import marching_cubes
-from genfem_base import set_nodemtx
+from genfem_base import set_nodemtx, get_snodes_uedges
 
 # compatibility
 try:
@@ -162,45 +162,27 @@ def smooth_mesh(mesh, n_iter=4, lam=0.6307, mu=-0.6347,
 
     import time
 
-    output('smoothing...')
     tt = time.clock()
 
-    domain = Domain('mesh', mesh)
-
     n_nod = mesh.n_nod
-    edges = domain.ed
 
     if weights is None:
         # initiate all vertices as inner - hierarchy = 2
-        node_group = nm.ones((n_nod,), dtype=nm.int16) * 2
+        node_group = nm.ones((n_nod,), dtype=nm.int8) * 2
+        sndi, edges = get_snodes_uedges(mesh.conns[0], mesh.descs[0])
         # boundary vertices - set hierarchy = 4
         if bconstr:
-            # get "nodes of surface"
-            if domain.fa: # 3D.
-                fa = domain.fa
-            else:
-                fa = domain.ed
-
-            flag = fa.mark_surface_facets()
-            ii = nm.where( flag > 0 )[0]
-            aux = nm.unique(fa.facets[ii])
-            if aux[0] == -1: # Triangular faces have -1 as 4. point.
-                aux = aux[1:]
-
-            node_group[aux] = 4
+            node_group[sndi] = 4
 
         # generate costs matrix
-        mtx_ed = edges.mtx.tocoo()
-        _, idxs = nm.unique(mtx_ed.row, return_index=True)
-        aux = edges.facets[mtx_ed.col[idxs]]
-        fc1 = aux[:,0]
-        fc2 = aux[:,1]
-        idxs = nm.where(node_group[fc2] >= node_group[fc1])
-        rows1 = fc1[idxs]
-        cols1 = fc2[idxs]
-        idxs = nm.where(node_group[fc1] >= node_group[fc2])
-        rows2 = fc2[idxs]
-        cols2 = fc1[idxs]
+        end1 = edges[:,0]
+        end2 = edges[:,1]
+        idxs = nm.where(node_group[end2] >= node_group[end1])
+        rows1 = end1[idxs]
+        cols1 = end2[idxs]
+        idxs = nm.where(node_group[end1] >= node_group[end2])
+        rows2 = end2[idxs]
+        cols2 = end1[idxs]
         crows = nm.concatenate((rows1, rows2))
         ccols = nm.concatenate((cols1, cols2))
         costs = sps.coo_matrix((nm.ones_like(crows), (crows, ccols)),
@@ -216,22 +198,15 @@ def smooth_mesh(mesh, n_iter=4, lam=0.6307, mu=-0.6347,
 
         #aux.setdiag(1.0 / costs.sum(1))
         weights = (aux.tocsc() * costs.tocsc()).tocsr()
-
+        
     coors = taubin(mesh.coors, weights, lam, mu, n_iter)
 
-    output('...done in %.2f s' % (time.clock() - tt))
-
     if volume_corr:
-        output('rescaling...')
         volume0, bc = get_volume(mesh.conns[0], mesh.coors)
         volume, _ = get_volume(mesh.conns[0], coors)
 
         scale = volume0 / volume
-        output('scale factor: %.2f' % scale)
-
         coors = (coors - bc) * scale + bc
-
-        output('...done in %.2f s' % (time.clock() - tt))
 
     return coors
 
@@ -284,7 +259,6 @@ def gen_mesh_from_voxels(voxels, dims, etype='q', mtype='v'):
                               nodeid[ix + 1,iy],
                               nodeid[ix + 1,iy + 1],
                               nodeid[ix,iy + 1]]).transpose()
-            nnd = 4
             edim = 2
 
         else:
@@ -312,7 +286,6 @@ def gen_mesh_from_voxels(voxels, dims, etype='q', mtype='v'):
 
             elems = nm.concatenate(felems)
 
-            nnd = 2
             edim = 1
 
     elif dim == 3:
@@ -327,7 +300,6 @@ def gen_mesh_from_voxels(voxels, dims, etype='q', mtype='v'):
                               nodeid[ix + 1,iy,iz + 1],
                               nodeid[ix + 1,iy + 1,iz + 1],
                               nodeid[ix,iy + 1,iz + 1]]).transpose()
-            nnd = 8
             edim = 3
 
         else:
@@ -372,7 +344,6 @@ def gen_mesh_from_voxels(voxels, dims, etype='q', mtype='v'):
 
             elems = nm.concatenate(felems)
 
-            nnd = 4
             edim = 2
 
     # reduce inner nodes
@@ -390,26 +361,27 @@ def gen_mesh_from_voxels(voxels, dims, etype='q', mtype='v'):
         aux[idx] = range(nnod)
         coors = coors[idx]
         
-        for ii in range(nnd):
+        for ii in range(elems.shape[1]):
             elems[:,ii] = aux[elems[:,ii]]
 
     if etype == 't':
         elems = elems_q2t(elems)
 
     nel = elems.shape[0]
+    nelnd = elems.shape[1]
 
     mesh = Mesh.from_data('voxel_data',
                           coors, nm.ones((nnod,), dtype=nm.int32),
                           {0: nm.ascontiguousarray(elems)},
                           {0: nm.ones((nel,), dtype=nm.int32)},
-                          {0: '%d_%d' % (edim, nnd)})
+                          {0: '%d_%d' % (edim, nelnd)})
 
     return mesh
 
-def gen_mesh_from_voxels_mc(voxels, voxelsizemm):
+def gen_mesh_from_voxels_mc(voxels, voxelsize):
     import scipy.spatial as scsp
 
-    tri = marching_cubes(voxels, voxelsizemm * 1e-3)
+    tri = marching_cubes(voxels, voxelsize)
     
     nel, nnd, dim = tri.shape
     coors = tri.reshape((nel * nnd, dim))
@@ -441,12 +413,12 @@ def gen_mesh_from_voxels_mc(voxels, voxelsizemm):
 
 usage = '%prog [options]\n' + __doc__.rstrip()
 help = {
-    'in_file': 'input *.mat file with segmented data',
+    'in_file': 'input *.seg file with segmented data',
     'out_file': 'output mesh file',
 }
 
 def main():
-    parser = OptionParser(description='Segmentation editor')
+    parser = OptionParser(description='FE mesh generators and smooth functions')
     parser.add_option('-f','--filename', action='store',
                       dest='in_filename', default=None,
                       help=help['in_file'])
@@ -462,11 +434,14 @@ def main():
         dataraw = loadmat(options.in_filename,
                           variable_names=['segdata', 'voxelsizemm'])
 
-    mesh = gen_mesh_from_voxels_mc(dataraw['segdata'], dataraw['voxelsizemm'])
+    # mesh = gen_mesh_from_voxels_mc(dataraw['segdata'], dataraw['voxelsizemm'] * 1e-3)
     
-    #mesh = gen_mesh_from_voxels(dataraw['segdata'], dataraw['voxelsizemm'],
-    #                            etype='q', mtype='s')
+    mesh = gen_mesh_from_voxels(dataraw['segdata'], dataraw['voxelsizemm'] * 1e-3,
+                               etype='t', mtype='s')
 
+    ncoors = smooth_mesh(mesh, n_iter=34, lam=0.6307, mu=-0.6347)
+    mesh.coors = ncoors
+    
     mesh.write(options.out_filename)
 
 if __name__ == "__main__":
