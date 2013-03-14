@@ -373,7 +373,7 @@ def marching_cubes(mtx, vsize=nm.array([1.0, 1.0, 1.0]), isoval=0.5):
     set_nodemtx(nmtx, vidxs, 'q')
     
     nidxs = nm.where(nmtx)
-    #del(nmtx)
+    del(nmtx)
 
     tri = []
     vsize = vsize.squeeze()
