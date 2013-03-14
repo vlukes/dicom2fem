@@ -91,7 +91,7 @@ class QVTKViewer(QDialog):
         
 usage = '%prog [options]\n' + __doc__.rstrip()
 help = {
-    'in_file': 'input *.mat file with "data" field',
+    'in_file': 'input VTK file with unstructured mesh',
 }
   
 def main():
