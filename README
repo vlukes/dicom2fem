@@ -6,7 +6,7 @@ About
 Generation of finite element meshes using computed tomography scans.
 Segmentation is based on the graph cut algorithm.
 
-Runnig the program
+Running the program
 ------------------
 
 To run DICOM2FEM use the following command:
@@ -17,7 +17,7 @@ Links
 -----
 
   https://github.com/vlukes/dicom2fem
-  http://sfepy.org/dicom2fem
+  http://sfepy.org/ct2fem
 
 Author
 ------
