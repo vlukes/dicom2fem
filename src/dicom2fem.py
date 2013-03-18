@@ -294,7 +294,25 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage('No DICOM data!')
             return
 
-        pyed = QTSeedEditor(self.dcm_3Ddata, mode='crop')
+        is_reduced = False
+        shape = self.dcm_3Ddata.shape
+        max12 = np.max(shape[:2])
+        if max12 > 128:
+            is_reduced = True
+            czoom = [128.0 / max12] * 2
+            if shape[2] > 32:
+                czoom.append(32.0 / shape[2])
+
+            else:
+                czoom.append(1.0)
+
+            czoom = np.array(czoom)
+            reduced_3Ddata = ndimage.zoom(self.dcm_3Ddata, czoom,
+                                          prefilter=False, mode='nearest')
+        else:
+            reduced_3Ddata = self.dcm_3Ddata
+             
+        pyed = QTSeedEditor(reduced_3Ddata, mode='crop')
         pyed.exec_()
         nzs = pyed.getSeeds().nonzero()
 
@@ -310,6 +328,12 @@ class MainWindow(QMainWindow):
                     break
 
                 cri.append((smin, smax))            
+            cri = np.array(cri)
+
+            if is_reduced and nzs is not None:
+                aux = (cri.T * (1.0 / czoom)).T
+                cri[:,0] = np.floor(aux[:,0])
+                cri[:,1] = np.ceil(aux[:,1])
 
         if nzs is not None:
             crop = self.dcm_3Ddata[cri[0][0]:(cri[0][1] + 1),
