@@ -45,6 +45,7 @@ class MainWindow(QMainWindow):
         self.dcm_3Ddata = None
         self.dcm_metadata = None
         self.dcm_zoom = None
+        self.dcm_offsetmm = np.array([0,0,0])
         self.voxel_volume = 0.0
         self.voxel_sizemm = None
         self.segmentation_seeds = None
@@ -86,7 +87,7 @@ class MainWindow(QMainWindow):
         btn_dcmcrop = QPushButton("Crop", self)
         btn_dcmcrop.clicked.connect(self.cropDcm)
         btn_dcmsave = QPushButton("Save DCM", self)
-        btn_dcmsave.clicked.connect(self.saveMat)
+        btn_dcmsave.clicked.connect(self.saveDcm)
         grid.addWidget(btn_dcmdir, rstart + 4, 1)
         grid.addWidget(btn_dcmred, rstart + 4, 2)
         grid.addWidget(btn_dcmcrop, rstart + 4, 3)
@@ -228,10 +229,10 @@ class MainWindow(QMainWindow):
         self.voxel_volume = np.prod(vxs)
 
     def loadDcmDir(self):
+        self.statusBar().showMessage('Reading DICOM directory...')
+
         if self.dcmdir is None:
             self.dcmdir = dcmreader.get_dcmdir_qt(app=True)
-
-        self.statusBar().showMessage('Reading DICOM directory...')
 
         if self.dcmdir is not None:
             dcr = dcmreader.DicomReader(os.path.abspath(self.dcmdir))
@@ -340,6 +341,7 @@ class MainWindow(QMainWindow):
                                    cri[1][0]:(cri[1][1] + 1),
                                    cri[2][0]:(cri[2][1] + 1)] 
             self.dcm_3Ddata = np.ascontiguousarray(crop)
+            self.dcm_offsetmm = cri[:,0] * self.voxel_sizemm
 
             self.setLabelText(self.text_dcm_data, self.getDcmInfo())
             self.statusBar().showMessage('Ready')
@@ -347,7 +349,7 @@ class MainWindow(QMainWindow):
         else:
             self.statusBar().showMessage('No crop information!')
 
-    def saveMat(self, event=None, filename=None):
+    def saveDcm(self, event=None, filename=None):
         if self.dcm_3Ddata is not None:
             if filename is None:
                 filename = str(QFileDialog.getSaveFileName(self, 'Save DCM file',
@@ -356,7 +358,10 @@ class MainWindow(QMainWindow):
                 self.statusBar().showMessage('Saving DICOM data...')
 
                 savemat(filename, {'data': self.dcm_3Ddata,
-                                   'voxelsizemm': self.voxel_sizemm})
+                                   'voxelsizemm': self.voxel_sizemm,
+                                   'offsetmm': self.dcm_offsetmm},
+                                   appendmat=False)
+
                 self.setLabelText(self.text_dcm_out, filename)
                 self.statusBar().showMessage('Ready')
             
@@ -375,10 +380,12 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage('Loading DICOM data...')
 
             data = loadmat(filename,
-                           variable_names=['data', 'voxelsizemm'])
+                           variable_names=['data', 'voxelsizemm', 'offsetmm'],
+                           appendmat=False)
             
             self.dcm_3Ddata = data['data']
             self.voxel_sizemm = data['voxelsizemm']
+            self.dcm_offsetmm = data['offsetmm'] 
             self.setVoxelVolume(self.voxel_sizemm.reshape((3,)))
             self.setLabelText(self.text_seg_in, filename)
             self.statusBar().showMessage('Ready')
@@ -444,11 +451,13 @@ class MainWindow(QMainWindow):
                 self.statusBar().showMessage('Saving segmentation data...')
 
                 outdata = {'segdata': self.segmentation_data,
-                            'voxelsizemm': self.voxel_sizemm}
+                            'voxelsizemm': self.voxel_sizemm,
+                            'offsetmm': self.dcm_offsetmm}
+
                 if self.segmentation_seeds is not None:
                     outdata['segseeds'] = self.segmentation_seeds
 
-                savemat(filename, outdata)
+                savemat(filename, outdata, appendmat=False)
                 self.setLabelText(self.text_seg_out, filename)
                 self.statusBar().showMessage('Ready')
 
@@ -467,7 +476,9 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage('Loading segmentation data...')
 
             data = loadmat(filename,
-                           variable_names=['segdata', 'segseeds', 'voxelsizemm'])
+                           variable_names=['segdata', 'segseeds',
+                                           'voxelsizemm', 'offsetmm'],
+                           appendmat=False)
 
             self.segmentation_data = data['segdata']
             if 'segseeds' in data:
@@ -477,6 +488,7 @@ class MainWindow(QMainWindow):
                 self.segmentation_seeds = None
 
             self.voxel_sizemm = data['voxelsizemm']
+            self.dcm_offsetmm = data['offsetmm'] 
             self.setVoxelVolume(self.voxel_sizemm.reshape((3,)))
             self.setLabelText(self.text_mesh_in, filename)
             self.statusBar().showMessage('Ready')
@@ -518,10 +530,11 @@ class MainWindow(QMainWindow):
         QApplication.processEvents()
         
         self.mesh_data = gen_mesh_from_voxels(self.segmentation_data,
-                                              self.voxel_sizemm * 1e-3,
+                                              self.voxel_sizemm * 1.0e-3,
                                               etype=etab[eid],
                                               mtype=mtab[mid])
-
+        self.mesh_data.coors += self.dcm_offsetmm.reshape((1,3)) * 1.0e-3
+        
         self.setLabelText(self.text_mesh_data, '%d %s'\
                           % (self.mesh_data.n_el,
                              elem_tab[self.mesh_data.descs[0]]))
@@ -536,7 +549,8 @@ class MainWindow(QMainWindow):
 
         if self.mesh_smooth_method == 'marching cubes':
             self.mesh_data = gen_mesh_from_voxels_mc(self.segmentation_data,
-                                                     self.voxel_sizemm * 1e-3)
+                                                     self.voxel_sizemm * 1.0e-3)
+            self.mesh_data.coors += self.dcm_offsetmm.reshape((1,3)) * 1.0e-3
 
         elif self.mesh_smooth_method == 'taubin':
             mid = self.rbtng_mesh_mesh.checkedId()
