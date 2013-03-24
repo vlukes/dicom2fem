@@ -230,21 +230,23 @@ class MainWindow(QMainWindow):
 
     def loadDcmDir(self):
         self.statusBar().showMessage('Reading DICOM directory...')
+        QApplication.processEvents()
 
         if self.dcmdir is None:
             self.dcmdir = dcmreader.get_dcmdir_qt(app=True)
 
         if self.dcmdir is not None:
-            dcr = dcmreader.DicomReader(os.path.abspath(self.dcmdir))
-
+            dcr = dcmreader.DicomReader(os.path.abspath(self.dcmdir),
+                                        qt_app=self)
         else:
             self.statusBar().showMessage('No DICOM directory specified!')
             return
-        
+
         if dcr.validData():
             self.dcm_3Ddata = dcr.get_3Ddata()
             self.dcm_metadata = dcr.get_metaData()
             self.voxel_sizemm = np.array(self.dcm_metadata['voxelsizemm'])
+
             self.setVoxelVolume(self.voxel_sizemm)
             self.setLabelText(self.text_dcm_dir, self.dcmdir)
             self.setLabelText(self.text_dcm_data, self.getDcmInfo())
@@ -258,6 +260,9 @@ class MainWindow(QMainWindow):
         if self.dcm_3Ddata is None:
             self.statusBar().showMessage('No DICOM data!')
             return
+
+        self.statusBar().showMessage('Reducing DICOM data...')
+        QApplication.processEvents()
 
         if factor is None:
             value, ok = QInputDialog.getText(self, 'Reduce DICOM data',
@@ -294,6 +299,9 @@ class MainWindow(QMainWindow):
         if self.dcm_3Ddata is None:
             self.statusBar().showMessage('No DICOM data!')
             return
+
+        self.statusBar().showMessage('Cropping DICOM data...')
+        QApplication.processEvents()
 
         is_reduced = False
         shape = self.dcm_3Ddata.shape
@@ -351,12 +359,13 @@ class MainWindow(QMainWindow):
 
     def saveDcm(self, event=None, filename=None):
         if self.dcm_3Ddata is not None:
+            self.statusBar().showMessage('Saving DICOM data...')
+            QApplication.processEvents()
+
             if filename is None:
                 filename = str(QFileDialog.getSaveFileName(self, 'Save DCM file',
                                                            filter='Files (*.dcm)'))
             if len(filename) > 0:
-                self.statusBar().showMessage('Saving DICOM data...')
-
                 savemat(filename, {'data': self.dcm_3Ddata,
                                    'voxelsizemm': self.voxel_sizemm,
                                    'offsetmm': self.dcm_offsetmm},
@@ -372,12 +381,14 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage('No DICOM data!')      
 
     def loadDcm(self, event=None, filename=None):
+        self.statusBar().showMessage('Loading DICOM data...')
+        QApplication.processEvents()
+
         if filename is None:
             filename = str(QFileDialog.getOpenFileName(self, 'Load DCM file',
                                                        filter='Files (*.dcm)'))
 
         if len(filename) > 0:
-            self.statusBar().showMessage('Loading DICOM data...')
 
             data = loadmat(filename,
                            variable_names=['data', 'voxelsizemm', 'offsetmm'],
@@ -443,12 +454,14 @@ class MainWindow(QMainWindow):
 
     def saveSeg(self, event=None, filename=None):
         if self.segmentation_data is not None:
+            self.statusBar().showMessage('Saving segmentation data...')
+            QApplication.processEvents()
+
             if filename is None:
                 filename = str(QFileDialog.getSaveFileName(self, 'Save SEG file',
                                                            filter='Files (*.seg)'))
 
             if len(filename) > 0:
-                self.statusBar().showMessage('Saving segmentation data...')
 
                 outdata = {'segdata': self.segmentation_data,
                             'voxelsizemm': self.voxel_sizemm,
@@ -474,6 +487,7 @@ class MainWindow(QMainWindow):
 
         if len(filename) > 0:
             self.statusBar().showMessage('Loading segmentation data...')
+            QApplication.processEvents()
 
             data = loadmat(filename,
                            variable_names=['segdata', 'segseeds',
@@ -498,13 +512,15 @@ class MainWindow(QMainWindow):
 
     def saveMesh(self, event=None, filename=None):
         if self.mesh_data is not None:
+            self.statusBar().showMessage('Saving mesh...')
+            QApplication.processEvents()
+
             if filename is None:
                 file_ext = inv_supported_formats[self.mesh_out_format]
                 filename = str(QFileDialog.getSaveFileName(self, 'Save MESH file',
                                                            filter='Files (*%s)' % file_ext))
 
             if len(filename) > 0:
-                self.statusBar().showMessage('Saving mesh...')
 
                 io = MeshIO.for_format(filename, format=self.mesh_out_format, writable=True)
                 io.write(filename, self.mesh_data)
