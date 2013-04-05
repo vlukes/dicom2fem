@@ -1,12 +1,48 @@
 Installation Instructions
 -------------------------
 
+Installing requires you to have installed:
+
+  * numpy (http://www.numpy.org)
+  * scipy (http://scipy.org)
+  * scikit-learn (http://scikit-learn.org)
+  * Cython - C-extension for Python (http://cython.org)
+  * PyQt - Python bindings for Qt application framework
+    (http://www.riverbankcomputing.com/software/pyqt)
+  * git - distributed version control system (http://git-scm.com)
+  * pygco - Graphcuts for Python (https://github.com/amueller/gco_python)
+  * pydicom - package for working with DICOM files
+    (http://code.google.com/p/pydicom)
+
+On Linux, ask the package manager of your distribution.
+
+On Windows, packages numpy, scipy, scikit-learn, Cython, PyQt and pydicom
+are parts of Python(x,y) distribution (http://code.google.com/p/pythonxy).
+
+Pygco has to be installed manually, in gitbash write:
+
+Linux:
+
+  git clone https://github.com/amueller/gco_python.git
+  cd gco_python
+  make
+  python setup.py install
+
+Windows:
+
+   git clone https://github.com/amueller/gco_python.git
+   mkdir gco_src && cd gco_src
+
+   download http://vision.csd.uwo.ca/code/gco-v3.0.zip
+
+   uznip gco-v3.0.zip
+   cd ..
+   python setup.py build_ext -i --compiler=mingw32
+
+
 Install DICOM2FEM:
 
   git clone --recursive https://github.com/vlukes/dicom2fem.git
-
-
-Follow the instructions in pyseg_base/INSTALL.
 
 
 Sample DICOM data can be found at:
