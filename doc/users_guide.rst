@@ -19,11 +19,11 @@ Sample DICOM data can be found at:
 
 
 Running the program
-------------------
+-------------------
 
 Command line usage::
 
-    $ python src/dicom2fem,py --help
+    $ python src/dicom2fem.py --help
     Usage: dicom2fem.py [options]
 
     Options:
