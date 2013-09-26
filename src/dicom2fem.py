@@ -25,7 +25,7 @@ sys.path.append("./pyseg_base/src/")
 
 import dcmreaddata as dcmreader
 from seed_editor_qt import QTSeedEditor
-import pycat
+import pycut
 from meshio import supported_capabilities, supported_formats, MeshIO
 
 from viewer import QVTKViewer
@@ -37,7 +37,7 @@ elem_tab = {'2_3': 'triangles', '3_4': 'tetrahedrons',
             '2_4': 'quads', '3_8': 'hexahedrons'}
 
 class MainWindow(QMainWindow):
-    
+
     def __init__(self, dcmdir=None):
         QMainWindow.__init__(self)
 
@@ -54,14 +54,14 @@ class MainWindow(QMainWindow):
         self.mesh_out_format = 'vtk'
         self.mesh_smooth_method = smooth_methods[0]
         self.initUI()
-        
-    def initUI(self):               
+
+    def initUI(self):
 
         cw = QWidget()
         self.setCentralWidget(cw)
         grid = QGridLayout()
         grid.setSpacing(15)
-        
+
         # status bar
         self.statusBar().showMessage('Ready')
 
@@ -70,7 +70,7 @@ class MainWindow(QMainWindow):
 
         ################ dicom reader
         rstart = 0
-        text_dcm = QLabel('DICOM reader') 
+        text_dcm = QLabel('DICOM reader')
         text_dcm.setFont(font_label)
         self.text_dcm_dir = QLabel('DICOM dir:')
         self.text_dcm_data = QLabel('DICOM data:')
@@ -99,7 +99,7 @@ class MainWindow(QMainWindow):
 
         ################ segmentation
         rstart = 6
-        text_seg = QLabel('Segmentation') 
+        text_seg = QLabel('Segmentation')
         text_seg.setFont(font_label)
         self.text_seg_in = QLabel('input data:')
         self.text_seg_data = QLabel('segment. data:')
@@ -128,7 +128,7 @@ class MainWindow(QMainWindow):
 
         ################ mesh gen.
         rstart = 12
-        text_mesh = QLabel('Mesh generation') 
+        text_mesh = QLabel('Mesh generation')
         text_mesh.setFont(font_label)
         self.text_mesh_in = QLabel('input data:')
         self.text_mesh_data = QLabel('mesh data:')
@@ -180,12 +180,12 @@ class MainWindow(QMainWindow):
         self.rbtng_mesh_elements.addButton(rbtn_mesh_elements_3, 1)
         self.rbtng_mesh_elements.addButton(rbtn_mesh_elements_4, 2)
         rbtn_mesh_elements_4.setChecked(True)
-        
+
         combo = QComboBox(self)
         combo.activated[str].connect(self.changeOut)
-        
+
         supp_write = []
-        for k, v in supported_capabilities.iteritems(): 
+        for k, v in supported_capabilities.iteritems():
             if 'w' in v:
                 supp_write.append(k)
 
@@ -202,14 +202,14 @@ class MainWindow(QMainWindow):
         hr = QFrame()
         hr.setFrameShape(QFrame.HLine)
         grid.addWidget(hr, rstart + 9, 0, 1, 6)
-        
+
         # quit
         btn_quit = QPushButton("Quit", self)
         btn_quit.clicked.connect(self.quit)
         grid.addWidget(btn_quit, 24, 2, 1, 2)
-        
+
         cw.setLayout(grid)
-        self.setWindowTitle('DICOM2FEM')    
+        self.setWindowTitle('DICOM2FEM')
         self.show()
 
     def quit(self, event):
@@ -218,13 +218,13 @@ class MainWindow(QMainWindow):
     def setLabelText(self, obj, text):
         dlab = str(obj.text())
         obj.setText(dlab[:dlab.find(':')] + ': %s' % text)
-        
-    def getDcmInfo(self):        
+
+    def getDcmInfo(self):
         vsize = tuple([float(ii) for ii in self.voxel_sizemm])
         ret = ' %dx%dx%d,  %fx%fx%f mm' % (self.dcm_3Ddata.shape + vsize)
-        
+
         return ret
-              
+
     def setVoxelVolume(self, vxs):
         self.voxel_volume = np.prod(vxs)
 
@@ -245,17 +245,16 @@ class MainWindow(QMainWindow):
         if dcr.validData():
             self.dcm_3Ddata = dcr.get_3Ddata()
             self.dcm_metadata = dcr.get_metaData()
-            self.voxel_sizemm = np.array(self.dcm_metadata['voxelsizemm'])
-
+            self.voxel_sizemm = np.array(self.dcm_metadata['voxelsize_mm'])
             self.setVoxelVolume(self.voxel_sizemm)
             self.setLabelText(self.text_dcm_dir, self.dcmdir)
             self.setLabelText(self.text_dcm_data, self.getDcmInfo())
             self.statusBar().showMessage('Ready')
             self.setLabelText(self.text_seg_in, 'DICOM reader')
-            
+
         else:
             self.statusBar().showMessage('No DICOM data in direcotry!')
-            
+
     def reduceDcm(self, event=None, factor=None, default=0.25):
         if self.dcm_3Ddata is None:
             self.statusBar().showMessage('No DICOM data!')
@@ -283,7 +282,7 @@ class MainWindow(QMainWindow):
         for ii in factor:
            if ii < 0.0 or ii > 1.0:
                self.dcm_zoom = None
-           
+
         if self.dcm_zoom is not None:
             self.dcm_3Ddata = ndimage.zoom(self.dcm_3Ddata, self.dcm_zoom,
                                            prefilter=False, mode='nearest')
@@ -303,59 +302,16 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage('Cropping DICOM data...')
         QApplication.processEvents()
 
-        is_reduced = False
-        shape = self.dcm_3Ddata.shape
-        max12 = np.max(shape[:2])
-        if max12 > 128:
-            is_reduced = True
-            czoom = [128.0 / max12] * 2
-            if shape[2] > 32:
-                czoom.append(32.0 / shape[2])
-
-            else:
-                czoom.append(1.0)
-
-            czoom = np.array(czoom)
-            reduced_3Ddata = ndimage.zoom(self.dcm_3Ddata, czoom,
-                                          prefilter=False, mode='nearest')
-        else:
-            reduced_3Ddata = self.dcm_3Ddata
-             
-        pyed = QTSeedEditor(reduced_3Ddata, mode='crop')
+        pyed = QTSeedEditor(self.dcm_3Ddata, mode='crop',
+                            voxelSize=self.voxel_sizemm)
         pyed.exec_()
-        nzs = pyed.getSeeds().nonzero()
+        self.dcm_3Ddata = pyed.getImg()
+        self.dcm_offsetmm = pyed.getOffset()
 
-        if nzs is not None:
-            cri = []
-            for ii in range(3):
-                if nzs[ii].shape[0] == 0:
-                    nzs = None
-                    break
-                smin, smax = np.min(nzs[ii]), np.max(nzs[ii])
-                if smin == smax:
-                    nzs = None
-                    break
+        self.setLabelText(self.text_dcm_data, self.getDcmInfo())
+        self.statusBar().showMessage('Ready')
 
-                cri.append((smin, smax))            
-            cri = np.array(cri)
-
-            if is_reduced and nzs is not None:
-                aux = (cri.T * (1.0 / czoom)).T
-                cri[:,0] = np.floor(aux[:,0])
-                cri[:,1] = np.ceil(aux[:,1])
-
-        if nzs is not None:
-            crop = self.dcm_3Ddata[cri[0][0]:(cri[0][1] + 1),
-                                   cri[1][0]:(cri[1][1] + 1),
-                                   cri[2][0]:(cri[2][1] + 1)] 
-            self.dcm_3Ddata = np.ascontiguousarray(crop)
-            self.dcm_offsetmm = cri[:,0] * self.voxel_sizemm
-
-            self.setLabelText(self.text_dcm_data, self.getDcmInfo())
-            self.statusBar().showMessage('Ready')
-
-        else:
-            self.statusBar().showMessage('No crop information!')
+        self.statusBar().showMessage('Ready')
 
     def saveDcm(self, event=None, filename=None):
         if self.dcm_3Ddata is not None:
@@ -367,18 +323,18 @@ class MainWindow(QMainWindow):
                                                            filter='Files (*.dcm)'))
             if len(filename) > 0:
                 savemat(filename, {'data': self.dcm_3Ddata,
-                                   'voxelsizemm': self.voxel_sizemm,
-                                   'offsetmm': self.dcm_offsetmm},
+                                   'voxelsize_mm': self.voxel_sizemm,
+                                   'offset_mm': self.dcm_offsetmm},
                                    appendmat=False)
 
                 self.setLabelText(self.text_dcm_out, filename)
                 self.statusBar().showMessage('Ready')
-            
+
             else:
                 self.statusBar().showMessage('No output file specified!')
 
         else:
-            self.statusBar().showMessage('No DICOM data!')      
+            self.statusBar().showMessage('No DICOM data!')
 
     def loadDcm(self, event=None, filename=None):
         self.statusBar().showMessage('Loading DICOM data...')
@@ -391,19 +347,19 @@ class MainWindow(QMainWindow):
         if len(filename) > 0:
 
             data = loadmat(filename,
-                           variable_names=['data', 'voxelsizemm', 'offsetmm'],
+                           variable_names=['data', 'voxelsize_mm', 'offset_mm'],
                            appendmat=False)
-            
+
             self.dcm_3Ddata = data['data']
-            self.voxel_sizemm = data['voxelsizemm']
-            self.dcm_offsetmm = data['offsetmm'] 
+            self.voxel_sizemm = data['voxelsize_mm']
+            self.dcm_offsetmm = data['offset_mm']
             self.setVoxelVolume(self.voxel_sizemm.reshape((3,)))
             self.setLabelText(self.text_seg_in, filename)
             self.statusBar().showMessage('Ready')
-            
+
         else:
             self.statusBar().showMessage('No input file specified!')
-            
+
     def checkSegData(self):
         if self.segmentation_data is None:
             self.statusBar().showMessage('No SEG data!')
@@ -425,20 +381,20 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage('No DICOM data!')
             return
 
-        igc = pycat.ImageGraphCut(self.dcm_3Ddata,
+        igc = pycut.ImageGraphCut(self.dcm_3Ddata,
                                   voxelsize=self.voxel_sizemm)
 
         pyed = QTSeedEditor(self.dcm_3Ddata,
                             seeds=self.segmentation_seeds,
                             modeFun=igc.interactivity_loop,
-                            voxelVolume=self.voxel_volume)
+                            voxelSize=self.voxel_sizemm)
         pyed.exec_()
 
         self.segmentation_data = pyed.getContours()
         self.segmentation_seeds = pyed.getSeeds()
         self.checkSegData()
 
-    def manualSeg(self): 
+    def manualSeg(self):
         if self.dcm_3Ddata is None:
             self.statusBar().showMessage('No DICOM data!')
             return
@@ -446,7 +402,7 @@ class MainWindow(QMainWindow):
         pyed = QTSeedEditor(self.dcm_3Ddata,
                             seeds=self.segmentation_data,
                             mode='draw',
-                            voxelVolume=self.voxel_volume)
+                            voxelSize=self.voxel_sizemm)
         pyed.exec_()
 
         self.segmentation_data = pyed.getSeeds()
@@ -463,9 +419,10 @@ class MainWindow(QMainWindow):
 
             if len(filename) > 0:
 
-                outdata = {'segdata': self.segmentation_data,
-                            'voxelsizemm': self.voxel_sizemm,
-                            'offsetmm': self.dcm_offsetmm}
+                outdata = {'data': self.dcm_3Ddata,
+                           'segdata': self.segmentation_data,
+                           'voxelsize_mm': self.voxel_sizemm,
+                           'offset_mm': self.dcm_offsetmm}
 
                 if self.segmentation_seeds is not None:
                     outdata['segseeds'] = self.segmentation_seeds
@@ -478,7 +435,7 @@ class MainWindow(QMainWindow):
                 self.statusBar().showMessage('No output file specified!')
 
         else:
-            self.statusBar().showMessage('No segmentation data!')      
+            self.statusBar().showMessage('No segmentation data!')
 
     def loadSeg(self, event=None, filename=None):
         if filename is None:
@@ -490,10 +447,11 @@ class MainWindow(QMainWindow):
             QApplication.processEvents()
 
             data = loadmat(filename,
-                           variable_names=['segdata', 'segseeds',
-                                           'voxelsizemm', 'offsetmm'],
+                           variable_names=['data', 'segdata', 'segseeds',
+                                           'voxelsize_mm', 'offset_mm'],
                            appendmat=False)
 
+            self.dcm_3Ddata = data['data']
             self.segmentation_data = data['segdata']
             if 'segseeds' in data:
                 self.segmentation_seeds = data['segseeds']
@@ -501,12 +459,12 @@ class MainWindow(QMainWindow):
             else:
                 self.segmentation_seeds = None
 
-            self.voxel_sizemm = data['voxelsizemm']
-            self.dcm_offsetmm = data['offsetmm'] 
+            self.voxel_sizemm = data['voxelsize_mm']
+            self.dcm_offsetmm = data['offset_mm']
             self.setVoxelVolume(self.voxel_sizemm.reshape((3,)))
             self.setLabelText(self.text_mesh_in, filename)
             self.statusBar().showMessage('Ready')
-            
+
         else:
             self.statusBar().showMessage('No input file specified!')
 
@@ -517,17 +475,20 @@ class MainWindow(QMainWindow):
 
             if filename is None:
                 file_ext = inv_supported_formats[self.mesh_out_format]
-                filename = str(QFileDialog.getSaveFileName(self, 'Save MESH file',
-                                                           filter='Files (*%s)' % file_ext))
+                filename = \
+                    str(QFileDialog.getSaveFileName(self, 'Save MESH file',
+                                                    filter='Files (*%s)'\
+                                                        % file_ext))
 
             if len(filename) > 0:
 
-                io = MeshIO.for_format(filename, format=self.mesh_out_format, writable=True)
+                io = MeshIO.for_format(filename, format=self.mesh_out_format,
+                                       writable=True)
                 io.write(filename, self.mesh_data)
 
                 self.setLabelText(self.text_mesh_out, filename)
                 self.statusBar().showMessage('Ready')
-            
+
             else:
                 self.statusBar().showMessage('No output file specified!')
 
@@ -544,13 +505,13 @@ class MainWindow(QMainWindow):
         mid = self.rbtng_mesh_mesh.checkedId()
         self.statusBar().showMessage('Generating mesh...')
         QApplication.processEvents()
-        
+
         self.mesh_data = gen_mesh_from_voxels(self.segmentation_data,
                                               self.voxel_sizemm * 1.0e-3,
                                               etype=etab[eid],
                                               mtype=mtab[mid])
         self.mesh_data.coors += self.dcm_offsetmm.reshape((1,3)) * 1.0e-3
-        
+
         self.setLabelText(self.text_mesh_data, '%d %s'\
                           % (self.mesh_data.n_el,
                              elem_tab[self.mesh_data.descs[0]]))
@@ -579,14 +540,14 @@ class MainWindow(QMainWindow):
             self.mesh_data.coors = smooth_mesh(self.mesh_data,
                                                n_iter=10, lam=0.6307, mu=-0.6347,
                                                volume_corr=volume_corr)
-            
+
         self.setLabelText(self.text_mesh_data, '%d %s, smooth method - %s'\
                           % (self.mesh_data.n_el,
                              elem_tab[self.mesh_data.descs[0]],
                               self.mesh_smooth_method))
 
         self.statusBar().showMessage('Ready')
-    
+
     def viewMesh(self):
         if self.mesh_data is not None:
             vtk_file = 'mesh_geom.vtk'
@@ -615,7 +576,7 @@ def main():
     parser.add_option('-d','--dcmdir', action='store',
                       dest='dcmdir', default=None,
                       help=help['dcm_dir'])
-    parser.add_option('-m','--dcmfile', action='store',
+    parser.add_option('-f','--dcmfile', action='store',
                       dest='dcmfile', default=None,
                       help=help['dcm_file'])
     parser.add_option('-s','--segfile', action='store',
