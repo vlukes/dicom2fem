@@ -16,10 +16,9 @@ import numpy as np
 import sys
 import os
 
-from PyQt4.QtCore import Qt
 from PyQt4.QtGui import QApplication, QMainWindow, QWidget,\
      QGridLayout, QLabel, QPushButton, QFrame, QFileDialog,\
-     QFont, QInputDialog, QComboBox, QRadioButton, QButtonGroup
+     QFont, QInputDialog, QComboBox
 
 sys.path.append("./pyseg_base/src/")
 
@@ -27,14 +26,35 @@ import dcmreaddata as dcmreader
 from seed_editor_qt import QTSeedEditor
 import pycut
 from meshio import supported_capabilities, supported_formats, MeshIO
+from seg2fem import gen_mesh_from_voxels, gen_mesh_from_voxels_mc
+from seg2fem import smooth_mesh
 
 from viewer import QVTKViewer
 
-inv_supported_formats = dict(zip(supported_formats.values(), supported_formats.keys()))
-smooth_methods = ['marching cubes', 'taubin']
+inv_supported_formats = dict(zip(supported_formats.values(),
+                                 supported_formats.keys()))
+smooth_methods = {
+    'taubin vol.': (smooth_mesh, {'n_iter': 10, 'volume_corr': True,
+                             'lam': 0.6307, 'mu': -0.6347}),
+    'taubin': (smooth_mesh, {'n_iter': 10, 'volume_corr': False,
+                             'lam': 0.6307, 'mu': -0.6347}),
 
-elem_tab = {'2_3': 'triangles', '3_4': 'tetrahedrons',
-            '2_4': 'quads', '3_8': 'hexahedrons'}
+    }
+
+mesh_generators = {
+    'surf/tri': (gen_mesh_from_voxels, {'etype': 't', 'mtype': 's'}),
+    'surf/quad': (gen_mesh_from_voxels, {'etype': 'q', 'mtype': 's'}),
+    'vol/tetra': (gen_mesh_from_voxels, {'etype': 't', 'mtype': 'v'}),
+    'vol/hexa': (gen_mesh_from_voxels, {'etype': 'q', 'mtype': 'v'}),
+    'marching cubes': (gen_mesh_from_voxels_mc, {}),
+    }
+
+elem_tab = {
+    '2_3': 'triangles',
+    '3_4': 'tetrahedrons',
+    '2_4': 'quads',
+    '3_8': 'hexahedrons'
+    }
 
 class MainWindow(QMainWindow):
 
@@ -52,7 +72,7 @@ class MainWindow(QMainWindow):
         self.segmentation_data = None
         self.mesh_data = None
         self.mesh_out_format = 'vtk'
-        self.mesh_smooth_method = smooth_methods[0]
+        self.mesh_smooth_method = 'taubin'
         self.initUI()
 
     def initUI(self):
@@ -152,52 +172,42 @@ class MainWindow(QMainWindow):
         grid.addWidget(btn_meshgener, rstart + 4, 2)
         grid.addWidget(btn_meshsmooth, rstart + 4, 3)
         grid.addWidget(btn_meshsave, rstart + 4, 4)
-        grid.addWidget(btn_meshview, rstart + 8, 3, 1, 2)
-        
-        text_mesh_mesh = QLabel('mesh:')
-        text_mesh_elements = QLabel('elements:')
+        grid.addWidget(btn_meshview, rstart + 8, 2, 1, 2)
+
+        text_mesh_mesh = QLabel('mesh generator:')
         text_mesh_smooth = QLabel('smooth method:')
         text_mesh_output = QLabel('output format:')
-        grid.addWidget(text_mesh_mesh, rstart + 6, 1)
-        grid.addWidget(text_mesh_elements, rstart + 6, 2)
+        grid.addWidget(text_mesh_mesh, rstart + 6, 2)
         grid.addWidget(text_mesh_smooth, rstart + 6, 3)
         grid.addWidget(text_mesh_output, rstart + 6, 4)
-        
-        rbtn_mesh_mesh_surf = QRadioButton('surface')
-        rbtn_mesh_mesh_vol = QRadioButton('volume')
-        grid.addWidget(rbtn_mesh_mesh_surf, rstart + 7, 1)
-        grid.addWidget(rbtn_mesh_mesh_vol, rstart + 8, 1)
-        self.rbtng_mesh_mesh = QButtonGroup(self)
-        self.rbtng_mesh_mesh.addButton(rbtn_mesh_mesh_surf, 1)
-        self.rbtng_mesh_mesh.addButton(rbtn_mesh_mesh_vol, 2)
-        rbtn_mesh_mesh_vol.setChecked(True)
 
-        rbtn_mesh_elements_3 = QRadioButton('tri/tetra')
-        rbtn_mesh_elements_4 = QRadioButton('quad/hexa')
-        grid.addWidget(rbtn_mesh_elements_3, rstart + 7, 2)
-        grid.addWidget(rbtn_mesh_elements_4, rstart + 8, 2)
-        self.rbtng_mesh_elements = QButtonGroup(self)
-        self.rbtng_mesh_elements.addButton(rbtn_mesh_elements_3, 1)
-        self.rbtng_mesh_elements.addButton(rbtn_mesh_elements_4, 2)
-        rbtn_mesh_elements_4.setChecked(True)
+        combo_mg = QComboBox(self)
+        combo_mg.activated[str].connect(self.changeMesh)
+        self.mesh_generator = 'marching cubes'
+        keys = mesh_generators.keys()
+        keys.sort()
+        combo_mg.addItems(keys)
+        combo_mg.setCurrentIndex(keys.index(self.mesh_generator))
+        grid.addWidget(combo_mg, rstart + 7, 2)
 
-        combo = QComboBox(self)
-        combo.activated[str].connect(self.changeOut)
+        combo_sm = QComboBox(self)
+        combo_sm.activated[str].connect(self.changeOut)
 
         supp_write = []
         for k, v in supported_capabilities.iteritems():
             if 'w' in v:
                 supp_write.append(k)
 
-        combo.addItems(supp_write)
-        combo.setCurrentIndex(supp_write.index('vtk'))
-        grid.addWidget(combo, rstart + 7, 4)
+        combo_sm.addItems(supp_write)
+        combo_sm.setCurrentIndex(supp_write.index('vtk'))
+        grid.addWidget(combo_sm, rstart + 7, 4)
 
-        combo2 = QComboBox(self)
-        combo2.activated[str].connect(self.changeSmoothMethod)
-        combo2.addItems(smooth_methods)
-        combo2.setCurrentIndex(smooth_methods.index(self.mesh_smooth_method))
-        grid.addWidget(combo2, rstart + 7, 3)
+        combo_out = QComboBox(self)
+        combo_out.activated[str].connect(self.changeSmoothMethod)
+        keys = smooth_methods.keys()
+        combo_out.addItems(keys)
+        combo_out.setCurrentIndex(keys.index('taubin'))
+        grid.addWidget(combo_out, rstart + 7, 3)
 
         hr = QFrame()
         hr.setFrameShape(QFrame.HLine)
@@ -255,7 +265,7 @@ class MainWindow(QMainWindow):
         else:
             self.statusBar().showMessage('No DICOM data in direcotry!')
 
-    def reduceDcm(self, event=None, factor=None, default=0.25):
+    def reduceDcm(self, event=None, factor=None, default=(0.5,0.5,0.5)):
         if self.dcm_3Ddata is None:
             self.statusBar().showMessage('No DICOM data!')
             return
@@ -265,20 +275,18 @@ class MainWindow(QMainWindow):
 
         if factor is None:
             value, ok = QInputDialog.getText(self, 'Reduce DICOM data',
-                                             'Reduce factor [0-1.0]:',
-                                             text='%.2f' % default)
+                                             'Reduce factors (RZ,RX,RY) [0-1.0]:',
+                                             text='%.2f,%.2f,%.2f' % default)
             if ok:
                 vals = value.split(',')
-                if len(vals) > 1:
+                if len(vals) == 3:
                     factor = [float(ii) for ii in vals]
 
                 else:
-                    factor = float(value)
+                    aux = float(vals[0])
+                    factor = [aux, aux, aux]
 
-        if np.isscalar(factor):
-            factor = [factor, factor, 1.0]
-
-        self.dcm_zoom = np.array(factor[:3])
+        self.dcm_zoom = np.array(factor)
         for ii in factor:
            if ii < 0.0 or ii > 1.0:
                self.dcm_zoom = None
@@ -319,8 +327,10 @@ class MainWindow(QMainWindow):
             QApplication.processEvents()
 
             if filename is None:
-                filename = str(QFileDialog.getSaveFileName(self, 'Save DCM file',
-                                                           filter='Files (*.dcm)'))
+                filename = \
+                    str(QFileDialog.getSaveFileName(self,
+                                                    'Save DCM file',
+                                                    filter='Files (*.dcm)'))
             if len(filename) > 0:
                 savemat(filename, {'data': self.dcm_3Ddata,
                                    'voxelsize_mm': self.voxel_sizemm,
@@ -414,8 +424,10 @@ class MainWindow(QMainWindow):
             QApplication.processEvents()
 
             if filename is None:
-                filename = str(QFileDialog.getSaveFileName(self, 'Save SEG file',
-                                                           filter='Files (*.seg)'))
+                filename = \
+                    str(QFileDialog.getSaveFileName(self,
+                                                    'Save SEG file',
+                                                    filter='Files (*.seg)'))
 
             if len(filename) > 0:
 
@@ -496,57 +508,45 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage('No mesh data!')
 
     def generMesh(self):
-        from seg2fem import gen_mesh_from_voxels
 
-        etab = {1: 't', 2: 'q'}
-        mtab = {1: 's', 2: 'v'}
-
-        eid = self.rbtng_mesh_elements.checkedId()
-        mid = self.rbtng_mesh_mesh.checkedId()
         self.statusBar().showMessage('Generating mesh...')
         QApplication.processEvents()
 
-        self.mesh_data = gen_mesh_from_voxels(self.segmentation_data,
-                                              self.voxel_sizemm * 1.0e-3,
-                                              etype=etab[eid],
-                                              mtype=mtab[mid])
-        self.mesh_data.coors += self.dcm_offsetmm.reshape((1,3)) * 1.0e-3
+        if self.segmentation_data is not None:
+            gen_fun, pars = mesh_generators[self.mesh_generator]
+            self.mesh_data = gen_fun(self.segmentation_data,
+                                     self.voxel_sizemm * 1.0e-3,
+                                     **pars)
 
-        self.setLabelText(self.text_mesh_data, '%d %s'\
-                          % (self.mesh_data.n_el,
-                             elem_tab[self.mesh_data.descs[0]]))
+            self.mesh_data.coors += self.dcm_offsetmm.reshape((1,3)) * 1.0e-3
 
-        self.statusBar().showMessage('Ready')
+            self.setLabelText(self.text_mesh_data, '%d %s'\
+                                  % (self.mesh_data.n_el,
+                                     elem_tab[self.mesh_data.descs[0]]))
+
+            self.statusBar().showMessage('Ready')
+
+        else:
+            self.statusBar().showMessage('No segmentation data!')
 
     def smoothMesh(self):
-        from seg2fem import gen_mesh_from_voxels_mc, smooth_mesh
-
         self.statusBar().showMessage('Smoothing mesh...')
         QApplication.processEvents()
 
-        if self.mesh_smooth_method == 'marching cubes':
-            self.mesh_data = gen_mesh_from_voxels_mc(self.segmentation_data,
-                                                     self.voxel_sizemm * 1.0e-3)
-            self.mesh_data.coors += self.dcm_offsetmm.reshape((1,3)) * 1.0e-3
+        if self.mesh_data is not None:
+            smooth_fun, pars = smooth_methods[self.mesh_smooth_method]
+            self.mesh_data.coors = smooth_fun(self.mesh_data, **pars)
 
-        elif self.mesh_smooth_method == 'taubin':
-            mid = self.rbtng_mesh_mesh.checkedId()
-            if mid == 'v':
-                 volume_corr=True
+            self.setLabelText(self.text_mesh_data,
+                              '%d %s, smooth method - %s'\
+                                  % (self.mesh_data.n_el,
+                                     elem_tab[self.mesh_data.descs[0]],
+                                     self.mesh_smooth_method))
 
-            else:
-                volume_corr=False
+            self.statusBar().showMessage('Ready')
 
-            self.mesh_data.coors = smooth_mesh(self.mesh_data,
-                                               n_iter=10, lam=0.6307, mu=-0.6347,
-                                               volume_corr=volume_corr)
-
-        self.setLabelText(self.text_mesh_data, '%d %s, smooth method - %s'\
-                          % (self.mesh_data.n_el,
-                             elem_tab[self.mesh_data.descs[0]],
-                              self.mesh_smooth_method))
-
-        self.statusBar().showMessage('Ready')
+        else:
+            self.statusBar().showMessage('No mesh data!')
 
     def viewMesh(self):
         if self.mesh_data is not None:
@@ -557,6 +557,9 @@ class MainWindow(QMainWindow):
 
         else:
             self.statusBar().showMessage('No mesh data!')
+
+    def changeMesh(self, val):
+        self.mesh_generator = str(val)
 
     def changeOut(self, val):
         self.mesh_out_format = str(val)
