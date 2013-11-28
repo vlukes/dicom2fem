@@ -160,9 +160,6 @@ def smooth_mesh(mesh, n_iter=4, lam=0.6307, mu=-0.6347,
 
         return vol, bc
 
-    import time
-
-    tt = time.clock()
 
     n_nod = mesh.n_nod
 
@@ -198,7 +195,7 @@ def smooth_mesh(mesh, n_iter=4, lam=0.6307, mu=-0.6347,
 
         #aux.setdiag(1.0 / costs.sum(1))
         weights = (aux.tocsc() * costs.tocsc()).tocsr()
-        
+
     coors = taubin(mesh.coors, weights, lam, mu, n_iter)
 
     if volume_corr:
@@ -223,6 +220,10 @@ def gen_mesh_from_voxels(voxels, dims, etype='q', mtype='v'):
     etype : integer, optional
         'q' - quadrilateral or hexahedral elements
         't' - triangular or tetrahedral elements
+    mtype : integer, optional
+        'v' - volumetric mesh
+        's' - surface mesh
+
     Returns
     -------
     mesh : Mesh instance
@@ -232,14 +233,14 @@ def gen_mesh_from_voxels(voxels, dims, etype='q', mtype='v'):
     dims = dims.squeeze()
     dim = len(dims)
     nddims = nm.array(voxels.shape) + 2
-    
+
     nodemtx = nm.zeros(nddims, dtype=nm.int8)
     vxidxs = nm.where(voxels)
     set_nodemtx(nodemtx, vxidxs, etype)
-    
+
     ndidx = nm.where(nodemtx)
     del(nodemtx)
-    
+
     coors = nm.array(ndidx).transpose() * dims
     nnod = coors.shape[0]
 
@@ -265,8 +266,10 @@ def gen_mesh_from_voxels(voxels, dims, etype='q', mtype='v'):
             fc = nm.zeros(nddims + (2,), dtype=nm.int32)
 
             # x
-            fc[ix,iy,:] = nm.array([nodeid[ix,iy + 1], nodeid[ix,iy]]).transpose()
-            fc[ix + 1,iy,:] = nm.array([nodeid[ix + 1,iy], nodeid[ix + 1,iy + 1]]).transpose()
+            fc[ix,iy,:] = nm.array([nodeid[ix,iy + 1],
+                                    nodeid[ix,iy]]).transpose()
+            fc[ix + 1,iy,:] = nm.array([nodeid[ix + 1,iy],
+                                        nodeid[ix + 1,iy + 1]]).transpose()
             nn[ix,iy] = 1
             nn[ix + 1,iy] += 1
 
@@ -276,11 +279,13 @@ def gen_mesh_from_voxels(voxels, dims, etype='q', mtype='v'):
             # y
             fc.fill(0)
             nn.fill(0)
-            fc[ix,iy,:] = nm.array([nodeid[ix,iy], nodeid[ix + 1,iy]]).transpose()
-            fc[ix,iy + 1,:] = nm.array([nodeid[ix + 1,iy + 1], nodeid[ix,iy + 1]]).transpose()
+            fc[ix,iy,:] = nm.array([nodeid[ix,iy],
+                                    nodeid[ix + 1,iy]]).transpose()
+            fc[ix,iy + 1,:] = nm.array([nodeid[ix + 1,iy + 1],
+                                        nodeid[ix,iy + 1]]).transpose()
             nn[ix,iy] = 1
             nn[ix,iy + 1] += 1
-            
+
             idx = nm.where(nn == 1)
             felems.append(fc[idx])
 
@@ -306,10 +311,14 @@ def gen_mesh_from_voxels(voxels, dims, etype='q', mtype='v'):
             fc = nm.zeros(tuple(nddims) + (4,), dtype=nm.int32)
 
             # x
-            fc[ix,iy,iz,:] = nm.array([nodeid[ix,iy,iz], nodeid[ix,iy,iz + 1],\
-                                       nodeid[ix,iy + 1,iz + 1], nodeid[ix,iy + 1,iz]]).transpose()
-            fc[ix + 1,iy,iz,:] = nm.array([nodeid[ix + 1,iy,iz], nodeid[ix + 1,iy + 1,iz],\
-                                           nodeid[ix + 1,iy + 1,iz + 1], nodeid[ix + 1,iy,iz + 1]]).transpose()
+            fc[ix,iy,iz,:] = nm.array([nodeid[ix,iy,iz],
+                                       nodeid[ix,iy,iz + 1],
+                                       nodeid[ix,iy + 1,iz + 1],
+                                       nodeid[ix,iy + 1,iz]]).transpose()
+            fc[ix + 1,iy,iz,:] = nm.array([nodeid[ix + 1,iy,iz],
+                                           nodeid[ix + 1,iy + 1,iz],
+                                           nodeid[ix + 1,iy + 1,iz + 1],
+                                           nodeid[ix + 1,iy,iz + 1]]).transpose()
             nn[ix,iy,iz] = 1
             nn[ix + 1,iy,iz] += 1
 
@@ -319,10 +328,14 @@ def gen_mesh_from_voxels(voxels, dims, etype='q', mtype='v'):
             # y
             fc.fill(0)
             nn.fill(0)
-            fc[ix,iy,iz,:] = nm.array([nodeid[ix,iy,iz], nodeid[ix + 1,iy,iz],\
-                                       nodeid[ix + 1,iy,iz + 1], nodeid[ix,iy,iz + 1]]).transpose()
-            fc[ix,iy + 1,iz,:] = nm.array([nodeid[ix,iy + 1,iz], nodeid[ix,iy + 1,iz + 1],\
-                                           nodeid[ix + 1,iy + 1,iz + 1], nodeid[ix + 1,iy + 1,iz]]).transpose()
+            fc[ix,iy,iz,:] = nm.array([nodeid[ix,iy,iz],
+                                       nodeid[ix + 1,iy,iz],
+                                       nodeid[ix + 1,iy,iz + 1],
+                                       nodeid[ix,iy,iz + 1]]).transpose()
+            fc[ix,iy + 1,iz,:] = nm.array([nodeid[ix,iy + 1,iz],
+                                           nodeid[ix,iy + 1,iz + 1],
+                                           nodeid[ix + 1,iy + 1,iz + 1],
+                                           nodeid[ix + 1,iy + 1,iz]]).transpose()
             nn[ix,iy,iz] = 1
             nn[ix,iy + 1,iz] += 1
 
@@ -332,13 +345,17 @@ def gen_mesh_from_voxels(voxels, dims, etype='q', mtype='v'):
             # z
             fc.fill(0)
             nn.fill(0)
-            fc[ix,iy,iz,:] = nm.array([nodeid[ix,iy,iz], nodeid[ix,iy + 1,iz],\
-                                       nodeid[ix + 1,iy + 1,iz], nodeid[ix + 1,iy,iz]]).transpose()
-            fc[ix,iy,iz + 1,:] = nm.array([nodeid[ix,iy,iz + 1], nodeid[ix + 1,iy,iz + 1],\
-                                           nodeid[ix + 1,iy + 1,iz + 1], nodeid[ix,iy + 1,iz + 1]]).transpose()
+            fc[ix,iy,iz,:] = nm.array([nodeid[ix,iy,iz],
+                                       nodeid[ix,iy + 1,iz],
+                                       nodeid[ix + 1,iy + 1,iz],
+                                       nodeid[ix + 1,iy,iz]]).transpose()
+            fc[ix,iy,iz + 1,:] = nm.array([nodeid[ix,iy,iz + 1],
+                                           nodeid[ix + 1,iy,iz + 1],\
+                                           nodeid[ix + 1,iy + 1,iz + 1],
+                                           nodeid[ix,iy + 1,iz + 1]]).transpose()
             nn[ix,iy,iz] = 1
             nn[ix,iy,iz + 1] += 1
-            
+
             idx = nm.where(nn == 1)
             felems.append(fc[idx])
 
@@ -357,10 +374,10 @@ def gen_mesh_from_voxels(voxels, dims, etype='q', mtype='v'):
 
         aux.fill(0)
         nnod = idx[0].shape[0]
-        
+
         aux[idx] = range(nnod)
         coors = coors[idx]
-        
+
         for ii in range(elems.shape[1]):
             elems[:,ii] = aux[elems[:,ii]]
 
@@ -382,14 +399,14 @@ def gen_mesh_from_voxels_mc(voxels, voxelsize):
     import scipy.spatial as scsp
 
     tri = marching_cubes(voxels, voxelsize)
-    
+
     nel, nnd, dim = tri.shape
     coors = tri.reshape((nel * nnd, dim))
     tree = scsp.ckdtree.cKDTree(coors)
     eps = nm.max(coors.max(axis=0) - coors.min(axis=0)) *1e-6
     dist, idx = tree.query(coors, k=24, distance_upper_bound=eps)
 
-    uniq = set([])    
+    uniq = set([])
     for ii in idx:
         ukey = ii[ii < tree.n]
         ukey.sort()
@@ -434,14 +451,13 @@ def main():
         dataraw = loadmat(options.in_filename,
                           variable_names=['segdata', 'voxelsizemm'])
 
-    # mesh = gen_mesh_from_voxels_mc(dataraw['segdata'], dataraw['voxelsizemm'] * 1e-3)
-    
-    mesh = gen_mesh_from_voxels(dataraw['segdata'], dataraw['voxelsizemm'] * 1e-3,
-                               etype='t', mtype='s')
+    mesh = gen_mesh_from_voxels(dataraw['segdata'],
+                                dataraw['voxelsizemm'] * 1e-3,
+                                etype='t', mtype='s')
 
     ncoors = smooth_mesh(mesh, n_iter=34, lam=0.6307, mu=-0.6347)
     mesh.coors = ncoors
-    
+
     mesh.write(options.out_filename)
 
 if __name__ == "__main__":
