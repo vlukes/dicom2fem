@@ -7,6 +7,8 @@ Example:
 
 $ dicom2fem -d sample_data
 """
+#TODO:
+# recalculate voxelsize when rescaled
 
 # import unittest
 from optparse import OptionParser
@@ -361,8 +363,8 @@ class MainWindow(QMainWindow):
                            appendmat=False)
 
             self.dcm_3Ddata = data['data']
-            self.voxel_sizemm = data['voxelsize_mm']
-            self.dcm_offsetmm = data['offset_mm']
+            self.voxel_sizemm = data['voxelsize_mm'].reshape((3,1))
+            self.dcm_offsetmm = data['offset_mm'].reshape((3,1))
             self.setVoxelVolume(self.voxel_sizemm.reshape((3,)))
             self.setLabelText(self.text_seg_in, filename)
             self.statusBar().showMessage('Ready')
@@ -471,8 +473,8 @@ class MainWindow(QMainWindow):
             else:
                 self.segmentation_seeds = None
 
-            self.voxel_sizemm = data['voxelsize_mm']
-            self.dcm_offsetmm = data['offset_mm']
+            self.voxel_sizemm = data['voxelsize_mm'].reshape((3,1))
+            self.dcm_offsetmm = data['offset_mm'].reshape((3,1))
             self.setVoxelVolume(self.voxel_sizemm.reshape((3,)))
             self.setLabelText(self.text_mesh_in, filename)
             self.statusBar().showMessage('Ready')
