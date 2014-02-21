@@ -19,8 +19,10 @@ import sys
 import os
 
 from PyQt4.QtGui import QApplication, QMainWindow, QWidget,\
-     QGridLayout, QLabel, QPushButton, QFrame, QFileDialog,\
-     QFont, QInputDialog, QComboBox
+     QHBoxLayout, QVBoxLayout, QTabWidget,\
+     QLabel, QPushButton, QFrame, QFileDialog,\
+     QFont, QInputDialog, QComboBox, QPixmap
+from PyQt4.Qt import QString
 
 sys.path.append("./pyseg_base/src/")
 
@@ -77,111 +79,142 @@ class MainWindow(QMainWindow):
         self.mesh_smooth_method = 'taubin'
         self.initUI()
 
-    def initUI(self):
+    def init_ReaderTab(self):
+        vbox = QVBoxLayout()
+        vbox.setSpacing(10)
 
-        cw = QWidget()
-        self.setCentralWidget(cw)
-        grid = QGridLayout()
-        grid.setSpacing(15)
-
-        # status bar
-        self.statusBar().showMessage('Ready')
-
-        font_label = QFont()
-        font_label.setBold(True)
-
-        ################ dicom reader
-        rstart = 0
-        text_dcm = QLabel('DICOM reader')
-        text_dcm.setFont(font_label)
         self.text_dcm_dir = QLabel('DICOM dir:')
         self.text_dcm_data = QLabel('DICOM data:')
-        self.text_dcm_out = QLabel('output file:')
-        grid.addWidget(text_dcm, rstart + 0, 1, 1, 4)
-        grid.addWidget(self.text_dcm_dir, rstart + 1, 1, 1, 4)
-        grid.addWidget(self.text_dcm_data, rstart + 2, 1, 1, 4)
-        grid.addWidget(self.text_dcm_out, rstart + 3, 1, 1, 4)
+        vbox.addWidget(QLabel())
+        vbox.addWidget(self.text_dcm_dir)
+        vbox.addWidget(self.text_dcm_data)
 
+        hr = QFrame()
+        hr.setFrameShape(QFrame.HLine)
+        vbox.addWidget(hr)
+
+        vbox1 = QVBoxLayout()
         btn_dcmdir = QPushButton("Load DICOM", self)
         btn_dcmdir.clicked.connect(self.loadDcmDir)
+        btn_dcmsave = QPushButton("Save DCM", self)
+        btn_dcmsave.clicked.connect(self.saveDcm)
+        vbox1.addWidget(btn_dcmdir)
+        vbox1.addWidget(btn_dcmsave)
+        vbox1.addStretch(1)
+
+        vbox2 = QVBoxLayout()
         btn_dcmred = QPushButton("Reduce", self)
         btn_dcmred.clicked.connect(self.reduceDcm)
         btn_dcmcrop = QPushButton("Crop", self)
         btn_dcmcrop.clicked.connect(self.cropDcm)
-        btn_dcmsave = QPushButton("Save DCM", self)
-        btn_dcmsave.clicked.connect(self.saveDcm)
-        grid.addWidget(btn_dcmdir, rstart + 4, 1)
-        grid.addWidget(btn_dcmred, rstart + 4, 2)
-        grid.addWidget(btn_dcmcrop, rstart + 4, 3)
-        grid.addWidget(btn_dcmsave, rstart + 4, 4)
+        vbox2.addWidget(btn_dcmred)
+        vbox2.addWidget(btn_dcmcrop)
+        vbox2.addStretch(1)
+
+        hbox = QHBoxLayout()
+        hbox.addStretch(1)
+        hbox.addLayout(vbox1)
+        hbox.addStretch(1)
+        hbox.addLayout(vbox2)
+        hbox.addStretch(1)
+
+        vbox.addStretch(1)
+        vbox.addLayout(hbox)
+        vbox.addStretch(1)
+
+        return vbox
+
+    def init_SegmentationTab(self):
+        vbox = QVBoxLayout()
+        vbox.setSpacing(10)
+
+        self.text_seg_in = QLabel('input data:')
+        self.text_seg_data = QLabel('segment. data:')
+        vbox.addWidget(QLabel())
+        vbox.addWidget(self.text_seg_in)
+        vbox.addWidget(self.text_seg_data)
 
         hr = QFrame()
         hr.setFrameShape(QFrame.HLine)
-        grid.addWidget(hr, rstart + 5, 0, 1, 6)
+        vbox.addWidget(hr)
 
-        ################ segmentation
-        rstart = 6
-        text_seg = QLabel('Segmentation')
-        text_seg.setFont(font_label)
-        self.text_seg_in = QLabel('input data:')
-        self.text_seg_data = QLabel('segment. data:')
-        self.text_seg_out = QLabel('output file:')
-        grid.addWidget(text_seg, rstart + 0, 1)
-        grid.addWidget(self.text_seg_in, rstart + 1, 1, 1, 4)
-        grid.addWidget(self.text_seg_data, rstart + 2, 1, 1, 4)
-        grid.addWidget(self.text_seg_out, rstart + 3, 1, 1, 4)
-
+        vbox1 = QVBoxLayout()
         btn_segload = QPushButton("Load DCM", self)
         btn_segload.clicked.connect(self.loadDcm)
+        btn_segsave = QPushButton("Save SEG", self)
+        btn_segsave.clicked.connect(self.saveSeg)
+        vbox1.addWidget(btn_segload)
+        vbox1.addWidget(btn_segsave)
+        vbox1.addStretch(1)
+
+        vbox2 = QVBoxLayout()
+        btn_maskreg = QPushButton("Mask region", self)
+        btn_maskreg.clicked.connect(self.maskRegion)
         btn_segauto = QPushButton("Automatic seg.", self)
         btn_segauto.clicked.connect(self.autoSeg)
         btn_segman = QPushButton("Manual seg.", self)
         btn_segman.clicked.connect(self.manualSeg)
-        btn_segsave = QPushButton("Save SEG", self)
-        btn_segsave.clicked.connect(self.saveSeg)
-        grid.addWidget(btn_segload, rstart + 4, 1)
-        grid.addWidget(btn_segauto, rstart + 4, 2)
-        grid.addWidget(btn_segman, rstart + 4, 3)
-        grid.addWidget(btn_segsave, rstart + 4, 4)
+        vbox2.addWidget(btn_maskreg)
+        vbox2.addWidget(btn_segauto)
+        vbox2.addWidget(btn_segman)
+        vbox2.addStretch(1)
+
+        hbox = QHBoxLayout()
+        hbox.addStretch(1)
+        hbox.addLayout(vbox1)
+        hbox.addStretch(1)
+        hbox.addLayout(vbox2)
+        hbox.addStretch(1)
+
+        vbox.addStretch(1)
+        vbox.addLayout(hbox)
+        vbox.addStretch(1)
+
+        return vbox
+
+    def init_MeshGenTab(self):
+        vbox = QVBoxLayout()
+        vbox.setSpacing(10)
+
+        self.text_mesh_in = QLabel('input data:')
+        self.text_mesh_data = QLabel('mesh data:')
+        vbox.addWidget(QLabel())
+        vbox.addWidget(self.text_mesh_in)
+        vbox.addWidget(self.text_mesh_data)
 
         hr = QFrame()
         hr.setFrameShape(QFrame.HLine)
-        grid.addWidget(hr, rstart + 5, 0, 1, 6)
+        vbox.addWidget(hr)
 
-        ################ mesh gen.
-        rstart = 12
-        text_mesh = QLabel('Mesh generation')
-        text_mesh.setFont(font_label)
-        self.text_mesh_in = QLabel('input data:')
-        self.text_mesh_data = QLabel('mesh data:')
-        self.text_mesh_out = QLabel('output file:')
-        grid.addWidget(text_mesh, rstart + 0, 1)
-        grid.addWidget(self.text_mesh_in, rstart + 1, 1, 1, 4)
-        grid.addWidget(self.text_mesh_data, rstart + 2, 1, 1, 4)
-        grid.addWidget(self.text_mesh_out, rstart + 3, 1, 1, 4)
-
+        vbox1 = QVBoxLayout()
         btn_meshload = QPushButton("Load SEG", self)
         btn_meshload.clicked.connect(self.loadSeg)
         btn_meshsave = QPushButton("Save MESH", self)
         btn_meshsave.clicked.connect(self.saveMesh)
+        text_mesh_output = QLabel('format:')
+
+        combo_sm = QComboBox(self)
+        combo_sm.activated[str].connect(self.changeOut)
+        supp_write = []
+        for k, v in supported_capabilities.iteritems():
+            if 'w' in v:
+                supp_write.append(k)
+
+        combo_sm.addItems(supp_write)
+        combo_sm.setCurrentIndex(supp_write.index('vtk'))
+
+        vbox1.addWidget(btn_meshload)
+        vbox1.addWidget(btn_meshsave)
+        hbox1 = QHBoxLayout()
+        hbox1.addWidget(text_mesh_output)
+        hbox1.addWidget(combo_sm)
+        vbox1.addLayout(hbox1)
+        vbox1.addStretch(1)
+
+        vbox2 = QVBoxLayout()
         btn_meshgener = QPushButton("Generate", self)
         btn_meshgener.clicked.connect(self.generMesh)
-        btn_meshsmooth = QPushButton("Smooth", self)
-        btn_meshsmooth.clicked.connect(self.smoothMesh)
-        btn_meshview = QPushButton("View", self)
-        btn_meshview.clicked.connect(self.viewMesh)
-        grid.addWidget(btn_meshload, rstart + 4, 1)
-        grid.addWidget(btn_meshgener, rstart + 4, 2)
-        grid.addWidget(btn_meshsmooth, rstart + 4, 3)
-        grid.addWidget(btn_meshsave, rstart + 4, 4)
-        grid.addWidget(btn_meshview, rstart + 8, 2, 1, 2)
-
-        text_mesh_mesh = QLabel('mesh generator:')
-        text_mesh_smooth = QLabel('smooth method:')
-        text_mesh_output = QLabel('output format:')
-        grid.addWidget(text_mesh_mesh, rstart + 6, 2)
-        grid.addWidget(text_mesh_smooth, rstart + 6, 3)
-        grid.addWidget(text_mesh_output, rstart + 6, 4)
+        text_mesh_mesh = QLabel('generator:')
 
         combo_mg = QComboBox(self)
         combo_mg.activated[str].connect(self.changeMesh)
@@ -190,37 +223,127 @@ class MainWindow(QMainWindow):
         keys.sort()
         combo_mg.addItems(keys)
         combo_mg.setCurrentIndex(keys.index(self.mesh_generator))
-        grid.addWidget(combo_mg, rstart + 7, 2)
 
-        combo_sm = QComboBox(self)
-        combo_sm.activated[str].connect(self.changeOut)
+        vbox2.addWidget(btn_meshgener)
+        hbox1 = QHBoxLayout()
+        hbox1.addWidget(text_mesh_mesh)
+        hbox1.addWidget(combo_mg)
+        vbox2.addLayout(hbox1)
+        #vbox2.addStretch(1)
+        vbox2.addWidget(QLabel())
 
-        supp_write = []
-        for k, v in supported_capabilities.iteritems():
-            if 'w' in v:
-                supp_write.append(k)
-
-        combo_sm.addItems(supp_write)
-        combo_sm.setCurrentIndex(supp_write.index('vtk'))
-        grid.addWidget(combo_sm, rstart + 7, 4)
+        btn_meshsmooth = QPushButton("Smooth", self)
+        btn_meshsmooth.clicked.connect(self.smoothMesh)
+        text_mesh_smooth = QLabel('method:')
 
         combo_out = QComboBox(self)
         combo_out.activated[str].connect(self.changeSmoothMethod)
         keys = smooth_methods.keys()
         combo_out.addItems(keys)
         combo_out.setCurrentIndex(keys.index('taubin'))
-        grid.addWidget(combo_out, rstart + 7, 3)
 
-        hr = QFrame()
-        hr.setFrameShape(QFrame.HLine)
-        grid.addWidget(hr, rstart + 9, 0, 1, 6)
+        vbox2.addWidget(btn_meshsmooth)
+        hbox1 = QHBoxLayout()
+        hbox1.addWidget(text_mesh_smooth)
+        hbox1.addWidget(combo_out)
+        vbox2.addLayout(hbox1)
+        vbox2.addStretch(1)
+
+        vbox3 = QVBoxLayout()
+        btn_meshview = QPushButton("Mesh preview", self)
+        btn_meshview.clicked.connect(self.viewMesh)
+        vbox3.addWidget(btn_meshview)
+        vbox3.addStretch(1)
+
+        hbox = QHBoxLayout()
+        hbox.addStretch(1)
+        hbox.addLayout(vbox1)
+        hbox.addStretch(1)
+        hbox.addLayout(vbox2)
+        hbox.addStretch(1)
+        hbox.addLayout(vbox3)
+        hbox.addStretch(1)
+
+        vbox.addStretch(1)
+        vbox.addLayout(hbox)
+        vbox.addStretch(1)
+
+        return vbox
+
+    def initUI(self):
+        import os.path as op
+        path_to_script = op.dirname(os.path.abspath(__file__))
+
+        cw = QWidget()
+        self.setCentralWidget(cw)
+        vbox = QVBoxLayout()
+        vbox.setSpacing(10)
+
+        # status bar
+        self.statusBar().showMessage('Ready')
+
+        # info panel
+        font_label = QFont()
+        font_label.setBold(True)
+        font_info = QFont()
+        font_info.setItalic(True)
+        font_info.setPixelSize(10)
+
+        dicom2fem_title = QLabel('DICOM2FEM')
+        info = QLabel('Version: 0.9\n\n' +
+                      'Developed by:\n' +
+                      'University of West Bohemia\n' +
+                      'Faculty of Applied Sciences\n' +
+                      QString.fromUtf8('V. Lukeš - 2014') +
+                      '\n\nBased on PYSEG_BASE project'
+                      )
+        info.setFont(font_info)
+        dicom2fem_title.setFont(font_label)
+        dicom2fem_logo = QLabel()
+        logopath = os.path.join(path_to_script, "../src/brain.png")
+        logo = QPixmap(logopath)
+        dicom2fem_logo.setPixmap(logo)
+        vbox1 = QVBoxLayout()
+        vbox1.addWidget(dicom2fem_title)
+        vbox1.addWidget(info)
+        vbox1.addStretch(1)
+
+        vbox2 = QVBoxLayout()
+        vbox2.addWidget(dicom2fem_logo)
+
+        hbox = QHBoxLayout()
+        hbox.addStretch(1)
+        hbox.addLayout(vbox1)
+        hbox.addStretch(1)
+        hbox.addLayout(vbox2)
+        hbox.addStretch(1)
+        vbox.addLayout(hbox)
+
+        tabs = QTabWidget()
+        tab1 = QWidget()
+        tab2 = QWidget()
+        tab3 = QWidget()
+
+        tab1.setLayout(self.init_ReaderTab())
+        tab2.setLayout(self.init_SegmentationTab())
+        tab3.setLayout(self.init_MeshGenTab())
+        tabs.addTab(tab1,"DICOM Reader")
+        tabs.addTab(tab2,"Segmentation")
+        tabs.addTab(tab3,"Mesh generator")
+
+        vbox.addWidget(tabs)
 
         # quit
         btn_quit = QPushButton("Quit", self)
         btn_quit.clicked.connect(self.quit)
-        grid.addWidget(btn_quit, 24, 2, 1, 2)
+        hbox = QHBoxLayout()
+        hbox.addStretch(1)
+        hbox.addWidget(btn_quit)
+        hbox.addStretch(1)
 
-        cw.setLayout(grid)
+        vbox.addLayout(hbox)
+
+        cw.setLayout(vbox)
         self.setWindowTitle('DICOM2FEM')
         self.show()
 
@@ -339,7 +462,7 @@ class MainWindow(QMainWindow):
                                    'offset_mm': self.dcm_offsetmm},
                                    appendmat=False)
 
-                self.setLabelText(self.text_dcm_out, filename)
+                #self.setLabelText(self.text_dcm_out, filename)
                 self.statusBar().showMessage('Ready')
 
             else:
@@ -387,6 +510,21 @@ class MainWindow(QMainWindow):
 
         else:
             self.statusBar().showMessage('Zero SEG data!')
+
+    def maskRegion(self):
+        if self.dcm_3Ddata is None:
+            self.statusBar().showMessage('No DICOM data!')
+            return
+
+        self.statusBar().showMessage('Mask region...')
+        QApplication.processEvents()
+
+        pyed = QTSeedEditor(self.dcm_3Ddata, mode='mask',
+                            voxelSize=self.voxel_sizemm)
+
+        pyed.exec_()
+
+        self.statusBar().showMessage('Ready')
 
     def autoSeg(self):
         if self.dcm_3Ddata is None:
@@ -442,7 +580,7 @@ class MainWindow(QMainWindow):
                     outdata['segseeds'] = self.segmentation_seeds
 
                 savemat(filename, outdata, appendmat=False)
-                self.setLabelText(self.text_seg_out, filename)
+                #self.setLabelText(self.text_seg_out, filename)
                 self.statusBar().showMessage('Ready')
 
             else:
@@ -500,7 +638,6 @@ class MainWindow(QMainWindow):
                                        writable=True)
                 io.write(filename, self.mesh_data)
 
-                self.setLabelText(self.text_mesh_out, filename)
                 self.statusBar().showMessage('Ready')
 
             else:
