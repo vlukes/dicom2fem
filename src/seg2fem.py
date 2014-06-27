@@ -145,7 +145,6 @@ def smooth_mesh(mesh, n_iter=4, lam=0.6307, mu=-0.6347,
 
         nel = el.shape[0]
 
-        #bc = nm.zeros((dim, ), dtype=nm.double)
         mul = 1.0 / factorial(dim)
         if dim == 3:
             mul *= -1.0
