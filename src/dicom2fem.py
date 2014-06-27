@@ -68,12 +68,14 @@ class MainWindow(QMainWindow):
         self.dcmdir = dcmdir
         self.dcm_3Ddata = None
         self.dcm_metadata = None
-        self.dcm_zoom = None
+        self.dcm_zoom = np.array([1.0, 1.0, 1.0])
         self.dcm_offsetmm = np.array([0,0,0])
         self.voxel_volume = 0.0
         self.voxel_sizemm = None
+        self.voxel_sizemm_scaled = None
         self.segmentation_seeds = None
         self.segmentation_data = None
+        self.segmentation_data_scaled = None
         self.mesh_data = None
         self.mesh_out_format = 'vtk'
         self.mesh_smooth_method = 'taubin'
@@ -103,8 +105,8 @@ class MainWindow(QMainWindow):
         vbox1.addStretch(1)
 
         vbox2 = QVBoxLayout()
-        btn_dcmred = QPushButton("Reduce", self)
-        btn_dcmred.clicked.connect(self.reduceDcm)
+        btn_dcmred = QPushButton("Rescale", self)
+        btn_dcmred.clicked.connect(self.rescaleDcm)
         btn_dcmcrop = QPushButton("Crop", self)
         btn_dcmcrop.clicked.connect(self.cropDcm)
         vbox2.addWidget(btn_dcmred)
@@ -181,6 +183,20 @@ class MainWindow(QMainWindow):
         vbox.addWidget(QLabel())
         vbox.addWidget(self.text_mesh_in)
         vbox.addWidget(self.text_mesh_data)
+
+        hr = QFrame()
+        hr.setFrameShape(QFrame.HLine)
+        vbox.addWidget(hr)
+
+        self.text_mesh_grid = QLabel('grid:')
+        vbox.addWidget(self.text_mesh_grid)
+        btn_meshrescale = QPushButton("Rescale", self)
+        btn_meshrescale.clicked.connect(self.rescaleSeg)
+        hbox0 = QHBoxLayout()
+        hbox0.addStretch(1)
+        hbox0.addWidget(btn_meshrescale)
+        hbox0.addStretch(1)
+        vbox.addLayout(hbox0)
 
         hr = QFrame()
         hr.setFrameShape(QFrame.HLine)
@@ -354,11 +370,26 @@ class MainWindow(QMainWindow):
         dlab = str(obj.text())
         obj.setText(dlab[:dlab.find(':')] + ': %s' % text)
 
-    def getDcmInfo(self):
-        vsize = tuple([float(ii) for ii in self.voxel_sizemm])
-        ret = ' %dx%dx%d,  %fx%fx%f mm' % (self.dcm_3Ddata.shape + vsize)
+    @staticmethod
+    def getSizeInfo(voxelsize, data):
+        vsize = tuple([float(ii) for ii in voxelsize])
+        ret = ' %dx%dx%d,  %fx%fx%f mm' % (data.shape + vsize)
 
         return ret
+
+    def getDcmInfo(self):
+        return self.getSizeInfo(self.voxel_sizemm, self.dcm_3Ddata)
+
+    def getSegInfo(self):
+        if self.segmentation_data_scaled is not None:
+            segdata = self.segmentation_data_scaled
+            voxelsize = self.voxel_sizemm_scaled
+
+        else:
+            segdata = self.segmentation_data
+            voxelsize = self.voxel_sizemm
+
+        return self.getSizeInfo(voxelsize, segdata)
 
     def setVoxelVolume(self, vxs):
         self.voxel_volume = np.prod(vxs)
@@ -390,42 +421,51 @@ class MainWindow(QMainWindow):
         else:
             self.statusBar().showMessage('No DICOM data in direcotry!')
 
-    def reduceDcm(self, event=None, factor=None, default=(0.5,0.5,0.5)):
+    def getRescaleValues(self, new_vsize, old_vsize, labels):
+        aux = '%.2f,%.2f,%.2f' % tuple(new_vsize)
+        value, ok = QInputDialog.getText(self, labels[0], labels[1],
+                                         text=aux)
+        if ok and value is not None:
+            vals = value.split(',')
+            if len(vals) == 3:
+                new_vsize = [float(ii) for ii in vals]
+
+            else:
+                aux = float(vals[0])
+                new_vsize = [aux, aux, aux]
+
+        zoom = old_vsize / np.array(new_vsize)
+
+        for ii in zoom:
+           if ii < 0.0 or ii > 100:
+               return None
+
+        return zoom
+
+    def rescaleDcm(self, event=None, new_vsize=[1.0,1.0,1.0]):
         if self.dcm_3Ddata is None:
             self.statusBar().showMessage('No DICOM data!')
             return
 
-        self.statusBar().showMessage('Reducing DICOM data...')
+        self.statusBar().showMessage('Rescaling DICOM data...')
         QApplication.processEvents()
 
-        if factor is None:
-            value, ok = QInputDialog.getText(self, 'Reduce DICOM data',
-                                             'Reduce factors (RZ,RX,RY) [0-1.0]:',
-                                             text='%.2f,%.2f,%.2f' % default)
-            if ok:
-                vals = value.split(',')
-                if len(vals) == 3:
-                    factor = [float(ii) for ii in vals]
+        if event is not None:
+            zoom = self.getRescaleValues(new_vsize, self.voxel_sizemm,
+                                         ('Rescale DICOM data',
+                                          'Voxel size [mm]:'))
 
-                else:
-                    aux = float(vals[0])
-                    factor = [aux, aux, aux]
-
-        self.dcm_zoom = np.array(factor)
-        for ii in factor:
-           if ii < 0.0 or ii > 1.0:
-               self.dcm_zoom = None
-
-        if self.dcm_zoom is not None:
-            self.dcm_3Ddata = ndimage.zoom(self.dcm_3Ddata, self.dcm_zoom,
+        if zoom is not None:
+            self.dcm_zoom *= zoom
+            self.dcm_3Ddata = ndimage.zoom(self.dcm_3Ddata, zoom,
                                            prefilter=False, mode='nearest')
-            self.voxel_sizemm = self.voxel_sizemm / self.dcm_zoom
+            self.voxel_sizemm /= zoom
             self.setLabelText(self.text_dcm_data, self.getDcmInfo())
 
             self.statusBar().showMessage('Ready')
 
         else:
-            self.statusBar().showMessage('No valid reduce factor!')
+            self.statusBar().showMessage('Invalid voxel size!')
 
     def cropDcm(self):
         if self.dcm_3Ddata is None:
@@ -486,8 +526,8 @@ class MainWindow(QMainWindow):
                            appendmat=False)
 
             self.dcm_3Ddata = data['data']
-            self.voxel_sizemm = data['voxelsize_mm'].reshape((3,1))
-            self.dcm_offsetmm = data['offset_mm'].reshape((3,1))
+            self.voxel_sizemm = data['voxelsize_mm'].reshape((3,))
+            self.dcm_offsetmm = data['offset_mm'].reshape((3,))
             self.setVoxelVolume(self.voxel_sizemm.reshape((3,)))
             self.setLabelText(self.text_seg_in, filename)
             self.statusBar().showMessage('Ready')
@@ -506,6 +546,7 @@ class MainWindow(QMainWindow):
             aux = ' voxels = %d, volume = %.2e mm3' % (nn, nn * self.voxel_volume)
             self.setLabelText(self.text_seg_data, aux)
             self.setLabelText(self.text_mesh_in, 'segmentation data')
+            self.setLabelText(self.text_mesh_grid, self.getSegInfo())
             self.statusBar().showMessage('Ready')
 
         else:
@@ -611,14 +652,40 @@ class MainWindow(QMainWindow):
             else:
                 self.segmentation_seeds = None
 
-            self.voxel_sizemm = data['voxelsize_mm'].reshape((3,1))
-            self.dcm_offsetmm = data['offset_mm'].reshape((3,1))
+            self.voxel_sizemm = data['voxelsize_mm'].reshape((3,))
+            self.dcm_offsetmm = data['offset_mm'].reshape((3,))
             self.setVoxelVolume(self.voxel_sizemm.reshape((3,)))
             self.setLabelText(self.text_mesh_in, filename)
+            self.setLabelText(self.text_mesh_grid, self.getSegInfo())
             self.statusBar().showMessage('Ready')
 
         else:
             self.statusBar().showMessage('No input file specified!')
+
+    def rescaleSeg(self, event=None, new_vsize=[1.0,1.0,1.0]):
+        if self.segmentation_data is None:
+            self.statusBar().showMessage('No segmentation data!')
+            return
+
+        self.statusBar().showMessage('Rescaling segmentation data...')
+        QApplication.processEvents()
+
+        zoom = self.getRescaleValues(new_vsize, self.voxel_sizemm,
+                                     ('Rescale segmentation data',
+                                      'Grid size [mm]:'))
+
+        if zoom is not None:
+            self.dcm_zoom *= zoom
+            self.segmentation_data_scaled =\
+                ndimage.zoom(self.segmentation_data, zoom,
+                             prefilter=False, mode='nearest')
+            self.voxel_sizemm_scaled = self.voxel_sizemm / zoom
+            self.setLabelText(self.text_mesh_grid, self.getSegInfo())
+
+            self.statusBar().showMessage('Ready')
+
+        else:
+            self.statusBar().showMessage('Invalid grid size!')
 
     def saveMesh(self, event=None, filename=None):
         if self.mesh_data is not None:
@@ -651,13 +718,19 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage('Generating mesh...')
         QApplication.processEvents()
 
-        if self.segmentation_data is not None:
-            gen_fun, pars = mesh_generators[self.mesh_generator]
-            self.mesh_data = gen_fun(self.segmentation_data,
-                                     self.voxel_sizemm * 1.0e-3,
-                                     **pars)
+        if self.segmentation_data_scaled is not None:
+            segdata = self.segmentation_data_scaled
+            voxelsize = self.voxel_sizemm_scaled * 1.0e-3
 
-            self.mesh_data.coors += self.dcm_offsetmm.reshape((1,3)) * 1.0e-3
+        else:
+            segdata = self.segmentation_data
+            voxelsize = self.voxel_sizemm * 1.0e-3
+
+        if segdata is not None:
+            gen_fun, pars = mesh_generators[self.mesh_generator]
+            self.mesh_data = gen_fun(segdata, voxelsize, **pars)
+
+            self.mesh_data.coors += self.dcm_offsetmm * 1.0e-3
 
             self.setLabelText(self.text_mesh_data, '%d %s'\
                                   % (self.mesh_data.n_el,
@@ -674,15 +747,21 @@ class MainWindow(QMainWindow):
 
         if self.mesh_data is not None:
             smooth_fun, pars = smooth_methods[self.mesh_smooth_method]
-            self.mesh_data.coors = smooth_fun(self.mesh_data, **pars)
+            etype = '%d_%d' % (self.mesh_data.dim,
+                               self.mesh_data.conns[0].shape[-1])
+            if (etype == '2_2' or etype == '3_3') and pars['volume_corr']:
+                self.statusBar().showMessage('No volume mesh!')
 
-            self.setLabelText(self.text_mesh_data,
-                              '%d %s, smooth method - %s'\
-                                  % (self.mesh_data.n_el,
-                                     elem_tab[self.mesh_data.descs[0]],
-                                     self.mesh_smooth_method))
+            else:
+                self.mesh_data.coors = smooth_fun(self.mesh_data, **pars)
 
-            self.statusBar().showMessage('Ready')
+                self.setLabelText(self.text_mesh_data,
+                                  '%d %s, smooth method - %s'\
+                                      % (self.mesh_data.n_el,
+                                         elem_tab[self.mesh_data.descs[0]],
+                                         self.mesh_smooth_method))
+
+                self.statusBar().showMessage('Ready')
 
         else:
             self.statusBar().showMessage('No mesh data!')
