@@ -349,11 +349,14 @@ class MainWindow(QMainWindow):
 
         vbox.addWidget(tabs)
 
-        # quit
-        btn_quit = QPushButton("Quit", self)
-        btn_quit.clicked.connect(self.quit)
+        # clear, quit
         hbox = QHBoxLayout()
         hbox.addStretch(1)
+        btn_clear = QPushButton("Clear", self)
+        btn_clear.clicked.connect(self.clearall)
+        hbox.addWidget(btn_clear)
+        btn_quit = QPushButton("Quit", self)
+        btn_quit.clicked.connect(self.quit)
         hbox.addWidget(btn_quit)
         hbox.addStretch(1)
 
@@ -365,6 +368,35 @@ class MainWindow(QMainWindow):
 
     def quit(self, event):
         self.close()
+
+    def clearall(self, event):
+        self.dcmdir = None
+        del(self.dcm_3Ddata)
+        self.dcm_3Ddata= None
+        del(self.dcm_metadata)
+        self.dcm_metadata = None
+        self.dcm_zoom = np.array([1.0, 1.0, 1.0])
+        self.dcm_offsetmm = np.array([0,0,0])
+        self.voxel_volume = 0.0
+        self.voxel_sizemm = None
+        self.voxel_sizemm_scaled = None
+        del(self.segmentation_seeds)
+        self.segmentation_seeds = None
+        del(self.segmentation_data)
+        self.segmentation_data = None
+        del(self.segmentation_data_scaled)
+        self.segmentation_data_scaled = None
+        del(self.mesh_data)
+        self.mesh_data = None
+
+
+        self.setLabelText(self.text_dcm_dir, '')
+        self.setLabelText(self.text_dcm_data, '')
+        self.setLabelText(self.text_seg_in, '')
+        self.setLabelText(self.text_seg_data, '')
+        self.setLabelText(self.text_mesh_in, '')
+        self.setLabelText(self.text_mesh_data, '')
+        self.setLabelText(self.text_mesh_grid, '')
 
     def setLabelText(self, obj, text):
         dlab = str(obj.text())
