@@ -26,9 +26,17 @@ from PyQt4.Qt import QString
 
 sys.path.append("./pyseg_base/src/")
 
-import dcmreaddata as dcmreader
-from seed_editor_qt import QTSeedEditor
-import pycut
+try:
+    import pysegbase.dcmreaddata as dcmreader
+    from pysegbase.seed_editor_qt import QTSeedEditor
+    import pysegbase.pycut as pycut
+
+except:
+    print "Warning: deprecated import of pysegbase used"
+    import dcmreaddata as dcmreader
+    from seed_editor_qt import QTSeedEditor
+    import pycut
+
 from meshio import supported_capabilities, supported_formats, MeshIO
 from seg2fem import gen_mesh_from_voxels, gen_mesh_from_voxels_mc
 from seg2fem import smooth_mesh
