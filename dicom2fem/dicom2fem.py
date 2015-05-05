@@ -48,11 +48,12 @@ smooth_methods = {
     }
 
 mesh_generators = {
-    'surf/tri': (gen_mesh_from_voxels, {'etype': 't', 'mtype': 's'}),
-    'surf/quad': (gen_mesh_from_voxels, {'etype': 'q', 'mtype': 's'}),
-    'vol/tetra': (gen_mesh_from_voxels, {'etype': 't', 'mtype': 'v'}),
-    'vol/hexa': (gen_mesh_from_voxels, {'etype': 'q', 'mtype': 'v'}),
-    'marching cubes': (gen_mesh_from_voxels_mc, {}),
+    'surface/tri': (6, gen_mesh_from_voxels, {'etype': 't', 'mtype': 's'}),
+    'surface/quad': (5, gen_mesh_from_voxels, {'etype': 'q', 'mtype': 's'}),
+    'volume/tetra': (4, gen_mesh_from_voxels, {'etype': 't', 'mtype': 'v'}),
+    'volume/hexa': (3, gen_mesh_from_voxels, {'etype': 'q', 'mtype': 'v'}),
+    'march. cubes - surf.': (2, gen_mesh_from_voxels_mc, {}),
+    'march. cubes - vol.': (1, gen_mesh_from_voxels_mc, {'gmsh3d': True}),
     }
 
 elem_tab = {
@@ -80,7 +81,7 @@ class MainWindow(QMainWindow):
         self.segmentation_data_scaled = None
         self.mesh_data = None
         self.mesh_out_format = 'vtk'
-        self.mesh_smooth_method = 'taubin'
+        self.mesh_smooth_method = 'taubin vol.'
         self.initUI()
 
     def init_ReaderTab(self):
@@ -213,11 +214,10 @@ class MainWindow(QMainWindow):
 
         combo_sm = QComboBox(self)
         combo_sm.activated[str].connect(self.changeOut)
-        supp_write = []
-        for k, v in supported_capabilities.iteritems():
-            if 'w' in v:
-                supp_write.append(k)
+        supp_write = [k for k, v in supported_capabilities.iteritems()\
+                      if 'w' in v]
 
+        supp_write.sort()
         combo_sm.addItems(supp_write)
         combo_sm.setCurrentIndex(supp_write.index('vtk'))
 
@@ -236,11 +236,12 @@ class MainWindow(QMainWindow):
 
         combo_mg = QComboBox(self)
         combo_mg.activated[str].connect(self.changeMesh)
-        self.mesh_generator = 'marching cubes'
-        keys = mesh_generators.keys()
-        keys.sort()
-        combo_mg.addItems(keys)
-        combo_mg.setCurrentIndex(keys.index(self.mesh_generator))
+        mg_labels = [(k, v[0]) for k, v in mesh_generators.iteritems()]
+        mg_labels.sort(key=lambda tup: tup[1])
+        mg_items = [ii[0] for ii in mg_labels]
+        self.mesh_generator = mg_items[0]
+        combo_mg.addItems(mg_items)
+        combo_mg.setCurrentIndex(mg_items.index(self.mesh_generator))
 
         vbox2.addWidget(btn_meshgener)
         hbox1 = QHBoxLayout()
@@ -258,7 +259,7 @@ class MainWindow(QMainWindow):
         combo_out.activated[str].connect(self.changeSmoothMethod)
         keys = smooth_methods.keys()
         combo_out.addItems(keys)
-        combo_out.setCurrentIndex(keys.index('taubin'))
+        combo_out.setCurrentIndex(keys.index('taubin vol.'))
 
         vbox2.addWidget(btn_meshsmooth)
         hbox1 = QHBoxLayout()
@@ -308,11 +309,11 @@ class MainWindow(QMainWindow):
         font_info.setPixelSize(10)
 
         dicom2fem_title = QLabel('DICOM2FEM')
-        info = QLabel('Version: 0.9\n\n' +
+        info = QLabel('Version: 0.91\n\n' +
                       'Developed by:\n' +
                       'University of West Bohemia\n' +
                       'Faculty of Applied Sciences\n' +
-                      QString.fromUtf8('V. Lukeš - 2014') +
+                      QString.fromUtf8('V. Lukeš - 2015') +
                       '\n\nBased on PYSEG_BASE project'
                       )
         info.setFont(font_info)
@@ -761,7 +762,7 @@ class MainWindow(QMainWindow):
             voxelsize = self.voxel_sizemm * 1.0e-3
 
         if segdata is not None:
-            gen_fun, pars = mesh_generators[self.mesh_generator]
+            mgid, gen_fun, pars = mesh_generators[self.mesh_generator]
             self.mesh_data = gen_fun(segdata, voxelsize, **pars)
 
             self.mesh_data.coors += self.dcm_offsetmm * 1.0e-3
