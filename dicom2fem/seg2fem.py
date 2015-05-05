@@ -28,6 +28,18 @@ except AttributeError:
 
     factorial = scm.factorial
 
+gmsh3d_geo = """
+Mesh.RemeshAlgorithm=1;
+Mesh.CharacteristicLengthFactor=__SCFACTOR__;
+Mesh.Algorithm3D = 4;
+Merge "__INFILE__";
+CreateTopology;
+Compound Surface(100)={1};
+Surface Loop(102)={100};
+Volume(200)={102};
+Physical Volume(201)={200};
+"""
+
 def output(msg):
     print msg
 
@@ -263,7 +275,6 @@ def gen_mesh_from_voxels(voxels, dims, etype='q', mtype='v'):
 
         else:
             fc = nm.zeros(nddims + (2,), dtype=nm.int32)
-
             # x
             fc[ix,iy,:] = nm.array([nodeid[ix,iy + 1],
                                     nodeid[ix,iy]]).transpose()
@@ -274,7 +285,6 @@ def gen_mesh_from_voxels(voxels, dims, etype='q', mtype='v'):
 
             idx = nm.where(nn == 1)
             felems.append(fc[idx])
-
             # y
             fc.fill(0)
             nn.fill(0)
@@ -340,7 +350,7 @@ def gen_mesh_from_voxels(voxels, dims, etype='q', mtype='v'):
 
             idx = nm.where(nn == 1)
             felems.append(fc[idx])
-        
+
             # z
             fc.fill(0)
             nn.fill(0)
@@ -394,7 +404,8 @@ def gen_mesh_from_voxels(voxels, dims, etype='q', mtype='v'):
 
     return mesh
 
-def gen_mesh_from_voxels_mc(voxels, voxelsize):
+def gen_mesh_from_voxels_mc(voxels, voxelsize,
+                            gmsh3d=False, scale_factor=0.25):
     import scipy.spatial as scsp
 
     tri = marching_cubes(voxels, voxelsize)
@@ -424,6 +435,26 @@ def gen_mesh_from_voxels_mc(voxels, voxelsize):
                           {0: nm.ascontiguousarray(ntri.reshape((nel, nnd)))},
                           {0: nm.ones((nel,), dtype=nm.int32)},
                           {0: '%d_%d' % (2, 3)})
+
+    if gmsh3d:
+        from vtk2stl import vtk2stl
+        import tempfile
+        import os
+
+        auxfile = os.path.join(tempfile.gettempdir(), 'dicom2fem_aux')
+        vtk_fn = auxfile + '_surfmc.vtk'
+        stl_fn = auxfile + '_surfmc.stl'
+        geo_fn = auxfile + '_surf2vol.geo'
+        mesh_fn = auxfile + '_volmv.mesh'
+        mesh.write(vtk_fn)
+        vtk2stl(vtk_fn, stl_fn)
+        geofile = open(geo_fn, 'wt')
+        geofile.write(gmsh3d_geo.replace('__INFILE__',
+                                         stl_fn).replace('__SCFACTOR__',
+                                                         str(scale_factor)))
+        geofile.close()
+        os.system('gmsh -3 -format mesh -o %s %s' % (mesh_fn, geo_fn))
+        mesh = Mesh.from_file(mesh_fn)
 
     return mesh
 
@@ -461,3 +492,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

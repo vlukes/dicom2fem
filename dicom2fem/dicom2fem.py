@@ -749,6 +749,19 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage('No mesh data!')
 
     def generMesh(self):
+        def getScaleFactor(self, value=0.25):
+            label = ('Marching cubes - volume remeshing',
+                     'Characteristic Length Factor:')
+            value, ok = QInputDialog.getText(self, label[0], label[1],
+                                             text='%.2f' % value)
+            if ok and value is not None:
+                value = float(value)
+
+            if value > 0. and value < 10.:
+                return value
+
+            else:
+                return None
 
         self.statusBar().showMessage('Generating mesh...')
         QApplication.processEvents()
@@ -763,6 +776,9 @@ class MainWindow(QMainWindow):
 
         if segdata is not None:
             mgid, gen_fun, pars = mesh_generators[self.mesh_generator]
+            if mgid == 1:
+                pars['scale_factor'] = getScaleFactor(self, value=0.25)
+
             self.mesh_data = gen_fun(segdata, voxelsize, **pars)
 
             self.mesh_data.coors += self.dcm_offsetmm * 1.0e-3
