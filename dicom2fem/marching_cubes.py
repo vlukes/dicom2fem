@@ -33,7 +33,7 @@ edge_table = nm.array([0x0, 0x109, 0x203, 0x30a, 0x406, 0x50f, 0x605, 0x70c,
                        0x69c, 0x795, 0x49f, 0x596, 0x29a, 0x393, 0x99 , 0x190,
                        0xf00, 0xe09, 0xd03, 0xc0a, 0xb06, 0xa0f, 0x905, 0x80c,
                        0x70c, 0x605, 0x50f, 0x406, 0x30a, 0x203, 0x109, 0x0])
-    
+
 tri_table = nm.array([[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
                       [0, 8, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
                       [0, 1, 9, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
@@ -291,6 +291,14 @@ tri_table = nm.array([[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -
                       [0, 3, 8, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
                       [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]])
 
+gen_grid_tab = [[0, 0, 0],
+                [0, 1, 0],
+                [1, 1, 0],
+                [1, 0, 0],
+                [0, 0, 1],
+                [0, 1, 1],
+                [1, 1, 1],
+                [1, 0, 1]]
 
 def vertex_interp(isoval, coor1, coor2, val1, val2):
     tol = 1.0e-12
@@ -303,17 +311,16 @@ def vertex_interp(isoval, coor1, coor2, val1, val2):
 
     if nm.abs(fisoval - fval2) < tol:
         return coor2
-    
+
     if nm.abs(fval1 - fval2) < tol:
         return coor1
-    
+
     mu = (fisoval - fval1) / (fval2 - fval1)
-    
+
     return coor1 + mu * (coor2 - coor1)
 
 def iso_element(cval, coors, isoval):
-    
-    cindex = 0        
+    cindex = 0
     if cval[0] < isoval: cindex |= 1
     if cval[1] < isoval: cindex |= 2
     if cval[2] < isoval: cindex |= 4
@@ -322,23 +329,35 @@ def iso_element(cval, coors, isoval):
     if cval[5] < isoval: cindex |= 32
     if cval[6] < isoval: cindex |= 64
     if cval[7] < isoval: cindex |= 128 
-        
+
     edge = edge_table[cindex]
     nodes = nm.zeros((12,3), dtype=nm.float64)
 
     if edge==0: return None
-    if edge & 1: nodes[0,:] = vertex_interp(isoval, coors[0], coors[1], cval[0], cval[1])
-    if edge & 2: nodes[1,:] = vertex_interp(isoval, coors[1], coors[2], cval[1], cval[2])
-    if edge & 4: nodes[2,:] = vertex_interp(isoval, coors[2], coors[3], cval[2], cval[3])
-    if edge & 8: nodes[3,:] = vertex_interp(isoval, coors[3], coors[0], cval[3], cval[0])
-    if edge & 16: nodes[4,:] = vertex_interp(isoval, coors[4], coors[5], cval[4], cval[5])
-    if edge & 32: nodes[5,:] = vertex_interp(isoval, coors[5], coors[6], cval[5], cval[6])
-    if edge & 64: nodes[6,:] = vertex_interp(isoval, coors[6], coors[7], cval[6], cval[7])
-    if edge & 128: nodes[7,:] = vertex_interp(isoval, coors[7], coors[4], cval[7], cval[4])
-    if edge & 256: nodes[8,:] = vertex_interp(isoval, coors[0], coors[4], cval[0], cval[4])
-    if edge & 512: nodes[9,:] = vertex_interp(isoval, coors[1], coors[5], cval[1], cval[5])
-    if edge & 1024: nodes[10,:] = vertex_interp(isoval, coors[2], coors[6], cval[2], cval[6])
-    if edge & 2048: nodes[11,:] = vertex_interp(isoval, coors[3], coors[7], cval[3], cval[7])
+    if edge & 1: nodes[0,:] = vertex_interp(isoval, coors[0], coors[1],
+                                            cval[0], cval[1])
+    if edge & 2: nodes[1,:] = vertex_interp(isoval, coors[1], coors[2],
+                                            cval[1], cval[2])
+    if edge & 4: nodes[2,:] = vertex_interp(isoval, coors[2], coors[3],
+                                            cval[2], cval[3])
+    if edge & 8: nodes[3,:] = vertex_interp(isoval, coors[3], coors[0],
+                                            cval[3], cval[0])
+    if edge & 16: nodes[4,:] = vertex_interp(isoval, coors[4], coors[5],
+                                             cval[4], cval[5])
+    if edge & 32: nodes[5,:] = vertex_interp(isoval, coors[5], coors[6],
+                                             cval[5], cval[6])
+    if edge & 64: nodes[6,:] = vertex_interp(isoval, coors[6], coors[7],
+                                             cval[6], cval[7])
+    if edge & 128: nodes[7,:] = vertex_interp(isoval, coors[7], coors[4],
+                                              cval[7], cval[4])
+    if edge & 256: nodes[8,:] = vertex_interp(isoval, coors[0], coors[4],
+                                              cval[0], cval[4])
+    if edge & 512: nodes[9,:] = vertex_interp(isoval, coors[1], coors[5],
+                                              cval[1], cval[5])
+    if edge & 1024: nodes[10,:] = vertex_interp(isoval, coors[2], coors[6],
+                                                cval[2], cval[6])
+    if edge & 2048: nodes[11,:] = vertex_interp(isoval, coors[3], coors[7],
+                                                cval[3], cval[7])
 
     tria = []
     tab = tri_table[cindex]
@@ -350,19 +369,7 @@ def iso_element(cval, coors, isoval):
 
     return tria
 
-
-gen_grid_tab = [[0, 0, 0],
-                [0, 1, 0],
-                [1, 1, 0],
-                [1, 0, 0],
-                [0, 0, 1],
-                [0, 1, 1],
-                [1, 1, 1],
-                [1, 0, 1]]
-                
 def marching_cubes(mtx, vsize=nm.array([1.0, 1.0, 1.0]), isoval=0.5):
-    dd = mtx.shape
-
     vidxs = nm.where(mtx)
 
     edims = nm.array(mtx.shape) + 2
@@ -371,7 +378,7 @@ def marching_cubes(mtx, vsize=nm.array([1.0, 1.0, 1.0]), isoval=0.5):
 
     nmtx = nm.zeros(edims, dtype=nm.int8)
     set_nodemtx(nmtx, vidxs, 'q')
-    
+
     nidxs = nm.where(nmtx)
     del(nmtx)
 
