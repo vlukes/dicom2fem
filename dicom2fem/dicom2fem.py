@@ -24,18 +24,12 @@ from PyQt4.QtGui import QApplication, QMainWindow, QWidget,\
      QFont, QInputDialog, QComboBox, QPixmap
 from PyQt4.Qt import QString
 
-sys.path.append("./pyseg_base/src/")
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                             '..', 'pyseg_base', 'pysegbase'))
 
-try:
-    import pysegbase.dcmreaddata as dcmreader
-    from pysegbase.seed_editor_qt import QTSeedEditor
-    import pysegbase.pycut as pycut
-
-except:
-    print "Warning: deprecated import of pysegbase used"
-    import dcmreaddata as dcmreader
-    from seed_editor_qt import QTSeedEditor
-    import pycut
+import dcmreaddata as dcmreader
+from seed_editor_qt import QTSeedEditor
+import pycut
 
 from meshio import supported_capabilities, supported_formats, MeshIO
 from seg2fem import gen_mesh_from_voxels, gen_mesh_from_voxels_mc
@@ -324,7 +318,7 @@ class MainWindow(QMainWindow):
         info.setFont(font_info)
         dicom2fem_title.setFont(font_label)
         dicom2fem_logo = QLabel()
-        logopath = os.path.join(path_to_script, "../src/brain.png")
+        logopath = os.path.join(path_to_script, 'brain.png')
         logo = QPixmap(logopath)
         dicom2fem_logo.setPixmap(logo)
         vbox1 = QVBoxLayout()
