@@ -33,13 +33,13 @@ Running the program
 
 To run DICOM2FEM use the following command:
 
-   python dicom2fem/dicom2fem.py
+      python dicom2fem/dicom2fem.py
 
 Links
 -----
 
 * https://github.com/vlukes/dicom2fem
-*  http://sfepy.org/dicom2fem
+* http://sfepy.org/dicom2fem
 
 Author
 ------
