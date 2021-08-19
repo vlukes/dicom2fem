@@ -1,4 +1,9 @@
-__all__ = ['base', 'dicom2fem', 'genfem_base', 'ioutils', 'marching_cubes',
-           'mesh', 'meshio', 'seg2fem', 'viewer', 'vtk2stl']
-import base, dicom2fem, genfem_base, ioutils, marching_cubes
-import mesh, meshio, seg2fem, viewer, vtk2stl
+__all__ = ['dicom2fem', 'genfem_base', 'marching_cubes',
+           'seg2fem']
+#    , 'viewer']
+
+import dicom2fem
+import genfem_base
+import marching_cubes
+import seg2fem
+# import viewer
