@@ -38,8 +38,8 @@ To run DICOM2FEM use the following command:
 Links
 -----
 
-  https://github.com/vlukes/dicom2fem
-  http://sfepy.org/dicom2fem
+* https://github.com/vlukes/dicom2fem
+*  http://sfepy.org/dicom2fem
 
 Author
 ------
