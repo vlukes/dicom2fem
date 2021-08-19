@@ -10,7 +10,7 @@ setup(
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # http://packaging.python.org/en/latest/tutorial.html#version
-    version='1.0.0',
+    version='2.0',
     url='https://github.com/vlukes/dicom2fem',
     author='Vladimir Lukes',
     author_email='vlukes@kme.zcu.cz',
@@ -27,19 +27,18 @@ setup(
         # Indicate who your project is intended for
         'Intended Audience :: Developers',
         'Topic :: Scientific/Engineering :: Bio-Informatics',
-
         # Pick your license as you wish (should match "license" above)
         'License :: OSI Approved :: BSD License',
-
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
         # 'Programming Language :: Python :: 2',
         # 'Programming Language :: Python :: 2.6',
-        'Programming Language :: Python :: 2.7',
+        # 'Programming Language :: Python :: 2.7',
         # 'Programming Language :: Python :: 3',
         # 'Programming Language :: Python :: 3.2',
         # 'Programming Language :: Python :: 3.3',
-        # 'Programming Language :: Python :: 3.4',
+        # 'Programming Language :: Python :: 3.3',
+        'Programming Language :: Python :: 3.8',
     ],
 
     # What does your project relate to?
@@ -53,8 +52,8 @@ setup(
     # project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:
     # https://packaging.python.org/en/latest/technical.html#install-requires-vs-requirements-files
-    install_requires=['numpy', 'pysegbase'],
-    dependency_links=['https://github.com/mjirik/gco_python'],
+    # install_requires=['numpy'],
+    # dependency_links=['https://github.com/mjirik/gco_python'],
 
     # If there are data files included in your packages that need to be
     # installed, specify them here.  If using Python 2.6 or less, then these
