@@ -307,11 +307,11 @@ class MainWindow(QMainWindow):
         font_info.setPixelSize(10)
 
         dicom2fem_title = QLabel('DICOM2FEM')
-        info = QLabel('Version: 0.91\n\n' +
+        info = QLabel('Version: 2.0\n\n' +
                       'Developed by:\n' +
                       'University of West Bohemia\n' +
                       'Faculty of Applied Sciences\n' +
-                      'V. Lukeš - 2015' +
+                      'V. Lukeš - 2021' +
                       '\n\nBased on PYSEG_BASE project'
                       )
         info.setFont(font_info)
