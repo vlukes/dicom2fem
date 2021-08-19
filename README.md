@@ -49,4 +49,4 @@ Vladimir Lukeš
 License
 -------
 
-New BSD License, see the LICENSE file.
+MIT license
