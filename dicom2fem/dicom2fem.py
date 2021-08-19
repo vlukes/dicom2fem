@@ -17,31 +17,33 @@ from scipy import ndimage
 import numpy as np
 import sys
 import os
+from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget,\
+    QHBoxLayout, QVBoxLayout, QTabWidget, QLabel, QPushButton,\
+    QFrame, QFileDialog, QInputDialog, QComboBox
+from PyQt5.QtGui import QFont, QPixmap
 
-from PyQt4.QtGui import QApplication, QMainWindow, QWidget,\
-     QHBoxLayout, QVBoxLayout, QTabWidget,\
-     QLabel, QPushButton, QFrame, QFileDialog,\
-     QFont, QInputDialog, QComboBox, QPixmap
-from PyQt4.Qt import QString
+import io3d.dcmreaddata as dcmreader
+from seededitorqt import QTSeedEditor
 
-sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                             '..', 'pyseg_base', 'pysegbase'))
-
-import dcmreaddata as dcmreader
-from seed_editor_qt import QTSeedEditor
-import pycut
-
-from meshio import supported_capabilities, supported_formats, MeshIO
 from seg2fem import gen_mesh_from_voxels, gen_mesh_from_voxels_mc
 from seg2fem import smooth_mesh
+# from viewer import QVTKViewer
 
-from viewer import QVTKViewer
+supported_formats = {
+    'vtk': '.vtk',
+    'nastran': '.bdf',
+    # 'abaqus': '.abq',
+    'medit': '.mesh',
+    # 'hmf': '.hmf',
+    # 'xdmf': 'xdmf',
+}
 
-inv_supported_formats = dict(zip(supported_formats.values(),
-                                 supported_formats.keys()))
+supported_formats_keys = list(supported_formats.keys())
+supported_formats_keys.sort()
+
 smooth_methods = {
     'taubin vol.': (smooth_mesh, {'n_iter': 10, 'volume_corr': True,
-                             'lam': 0.6307, 'mu': -0.6347}),
+                                  'lam': 0.6307, 'mu': -0.6347}),
     'taubin': (smooth_mesh, {'n_iter': 10, 'volume_corr': False,
                              'lam': 0.6307, 'mu': -0.6347}),
 
@@ -54,14 +56,15 @@ mesh_generators = {
     'volume/hexa': (3, gen_mesh_from_voxels, {'etype': 'q', 'mtype': 'v'}),
     'march. cubes - surf.': (2, gen_mesh_from_voxels_mc, {}),
     'march. cubes - vol.': (1, gen_mesh_from_voxels_mc, {'gmsh3d': True}),
-    }
+}
 
 elem_tab = {
     '2_3': 'triangles',
     '3_4': 'tetrahedrons',
     '2_4': 'quads',
     '3_8': 'hexahedrons'
-    }
+}
+
 
 class MainWindow(QMainWindow):
 
@@ -214,12 +217,8 @@ class MainWindow(QMainWindow):
 
         combo_sm = QComboBox(self)
         combo_sm.activated[str].connect(self.changeOut)
-        supp_write = [k for k, v in supported_capabilities.iteritems()\
-                      if 'w' in v]
-
-        supp_write.sort()
-        combo_sm.addItems(supp_write)
-        combo_sm.setCurrentIndex(supp_write.index('vtk'))
+        combo_sm.addItems(supported_formats_keys)
+        combo_sm.setCurrentIndex(supported_formats_keys.index('vtk'))
 
         vbox1.addWidget(btn_meshload)
         vbox1.addWidget(btn_meshsave)
@@ -236,7 +235,7 @@ class MainWindow(QMainWindow):
 
         combo_mg = QComboBox(self)
         combo_mg.activated[str].connect(self.changeMesh)
-        mg_labels = [(k, v[0]) for k, v in mesh_generators.iteritems()]
+        mg_labels = [(k, v[0]) for k, v in mesh_generators.items()]
         mg_labels.sort(key=lambda tup: tup[1])
         mg_items = [ii[0] for ii in mg_labels]
         self.mesh_generator = mg_items[0]
@@ -248,7 +247,6 @@ class MainWindow(QMainWindow):
         hbox1.addWidget(text_mesh_mesh)
         hbox1.addWidget(combo_mg)
         vbox2.addLayout(hbox1)
-        #vbox2.addStretch(1)
         vbox2.addWidget(QLabel())
 
         btn_meshsmooth = QPushButton("Smooth", self)
@@ -259,7 +257,7 @@ class MainWindow(QMainWindow):
         combo_out.activated[str].connect(self.changeSmoothMethod)
         keys = smooth_methods.keys()
         combo_out.addItems(keys)
-        combo_out.setCurrentIndex(keys.index('taubin vol.'))
+        combo_out.setCurrentIndex(list(keys).index('taubin vol.'))
 
         vbox2.addWidget(btn_meshsmooth)
         hbox1 = QHBoxLayout()
@@ -313,7 +311,7 @@ class MainWindow(QMainWindow):
                       'Developed by:\n' +
                       'University of West Bohemia\n' +
                       'Faculty of Applied Sciences\n' +
-                      QString.fromUtf8('V. Lukeš - 2015') +
+                      'V. Lukeš - 2015' +
                       '\n\nBased on PYSEG_BASE project'
                       )
         info.setFont(font_info)
@@ -346,9 +344,9 @@ class MainWindow(QMainWindow):
         tab1.setLayout(self.init_ReaderTab())
         tab2.setLayout(self.init_SegmentationTab())
         tab3.setLayout(self.init_MeshGenTab())
-        tabs.addTab(tab1,"DICOM Reader")
-        tabs.addTab(tab2,"Segmentation")
-        tabs.addTab(tab3,"Mesh generator")
+        tabs.addTab(tab1, "DICOM Reader")
+        tabs.addTab(tab2, "Segmentation")
+        tabs.addTab(tab3, "Mesh generator")
 
         vbox.addWidget(tabs)
 
@@ -375,11 +373,11 @@ class MainWindow(QMainWindow):
     def clearall(self, event):
         self.dcmdir = None
         del(self.dcm_3Ddata)
-        self.dcm_3Ddata= None
+        self.dcm_3Ddata = None
         del(self.dcm_metadata)
         self.dcm_metadata = None
         self.dcm_zoom = np.array([1.0, 1.0, 1.0])
-        self.dcm_offsetmm = np.array([0,0,0])
+        self.dcm_offsetmm = np.array([0, 0, 0])
         self.voxel_volume = 0.0
         self.voxel_sizemm = None
         self.voxel_sizemm_scaled = None
@@ -391,7 +389,6 @@ class MainWindow(QMainWindow):
         self.segmentation_data_scaled = None
         del(self.mesh_data)
         self.mesh_data = None
-
 
         self.setLabelText(self.text_dcm_dir, '')
         self.setLabelText(self.text_dcm_data, '')
@@ -447,6 +444,8 @@ class MainWindow(QMainWindow):
             self.dcm_3Ddata = dcr.get_3Ddata()
             self.dcm_metadata = dcr.get_metaData()
             self.voxel_sizemm = np.array(self.dcm_metadata['voxelsize_mm'])
+            if self.voxel_sizemm[0] < 1e-9:
+                self.voxel_sizemm[0] = 1
             self.setVoxelVolume(self.voxel_sizemm)
             self.setLabelText(self.text_dcm_dir, self.dcmdir)
             self.setLabelText(self.text_dcm_data, self.getDcmInfo())
@@ -530,12 +529,11 @@ class MainWindow(QMainWindow):
                 filename = \
                     str(QFileDialog.getSaveFileName(self,
                                                     'Save DCM file',
-                                                    filter='Files (*.dcm)'))
+                                                    filter='Files (*.dcm)')[0])
             if len(filename) > 0:
                 savemat(filename, {'data': self.dcm_3Ddata,
                                    'voxelsize_mm': self.voxel_sizemm,
-                                   'offset_mm': self.dcm_offsetmm},
-                                   appendmat=False)
+                                   'offset_mm': self.dcm_offsetmm})
 
                 #self.setLabelText(self.text_dcm_out, filename)
                 self.statusBar().showMessage('Ready')
@@ -552,7 +550,7 @@ class MainWindow(QMainWindow):
 
         if filename is None:
             filename = str(QFileDialog.getOpenFileName(self, 'Load DCM file',
-                                                       filter='Files (*.dcm)'))
+                                                       filter='Files (*.dcm)')[0])
 
         if len(filename) > 0:
 
@@ -578,7 +576,8 @@ class MainWindow(QMainWindow):
         nzs = self.segmentation_data.nonzero()
         nn = nzs[0].shape[0]
         if nn > 0:
-            aux = ' voxels = %d, volume = %.2e mm3' % (nn, nn * self.voxel_volume)
+            aux = ' voxels = %d, volume = %.2e mm3'\
+                % (nn, nn * self.voxel_volume)
             self.setLabelText(self.text_seg_data, aux)
             self.setLabelText(self.text_mesh_in, 'segmentation data')
             self.setLabelText(self.text_mesh_grid, self.getSegInfo())
@@ -603,6 +602,8 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage('Ready')
 
     def autoSeg(self):
+        from imcut import pycut
+
         if self.dcm_3Ddata is None:
             self.statusBar().showMessage('No DICOM data!')
             return
@@ -643,7 +644,7 @@ class MainWindow(QMainWindow):
                 filename = \
                     str(QFileDialog.getSaveFileName(self,
                                                     'Save SEG file',
-                                                    filter='Files (*.seg)'))
+                                                    filter='Files (*.seg)')[0])
 
             if len(filename) > 0:
 
@@ -668,7 +669,7 @@ class MainWindow(QMainWindow):
     def loadSeg(self, event=None, filename=None):
         if filename is None:
             filename = str(QFileDialog.getOpenFileName(self, 'Load SEG file',
-                                                       filter='Files (*.seg)'))
+                                                       filter='Files (*.seg)')[0])
 
         if len(filename) > 0:
             self.statusBar().showMessage('Loading segmentation data...')
@@ -697,7 +698,7 @@ class MainWindow(QMainWindow):
         else:
             self.statusBar().showMessage('No input file specified!')
 
-    def rescaleSeg(self, event=None, new_vsize=[1.0,1.0,1.0]):
+    def rescaleSeg(self, event=None, new_vsize=[1.0, 1.0, 1.0]):
         if self.segmentation_data is None:
             self.statusBar().showMessage('No segmentation data!')
             return
@@ -728,20 +729,15 @@ class MainWindow(QMainWindow):
             QApplication.processEvents()
 
             if filename is None:
-                file_ext = inv_supported_formats[self.mesh_out_format]
+                file_ext = supported_formats[self.mesh_out_format]
                 filename = \
                     str(QFileDialog.getSaveFileName(self, 'Save MESH file',
-                                                    filter='Files (*%s)'\
-                                                        % file_ext))
+                                                    filter='Files (*%s)'
+                                                    % file_ext)[0])
 
             if len(filename) > 0:
-
-                io = MeshIO.for_format(filename, format=self.mesh_out_format,
-                                       writable=True)
-                io.write(filename, self.mesh_data)
-
+                self.mesh_data.write(filename)
                 self.statusBar().showMessage('Ready')
-
             else:
                 self.statusBar().showMessage('No output file specified!')
 
@@ -754,14 +750,12 @@ class MainWindow(QMainWindow):
                      'Characteristic Length Factor:')
             value, ok = QInputDialog.getText(self, label[0], label[1],
                                              text='%.2f' % value)
-            if ok and value is not None:
-                value = float(value)
+            if ok:
+                if not(isinstance(value, float)):
+                    value = float(value)
 
-            if value > 0. and value < 10.:
-                return value
-
-            else:
-                return None
+                if value > 0. and value < 10.:
+                    return value
 
         self.statusBar().showMessage('Generating mesh...')
         QApplication.processEvents()
@@ -781,11 +775,11 @@ class MainWindow(QMainWindow):
 
             self.mesh_data = gen_fun(segdata, voxelsize, **pars)
 
-            self.mesh_data.coors += self.dcm_offsetmm * 1.0e-3
+            self.mesh_data.points += self.dcm_offsetmm * 1.0e-3
 
-            self.setLabelText(self.text_mesh_data, '%d %s'\
-                                  % (self.mesh_data.n_el,
-                                     elem_tab[self.mesh_data.descs[0]]))
+            cells = self.mesh_data.cells[0]
+            self.setLabelText(self.text_mesh_data, '%d %s'
+                              % (cells.data.shape[0], cells.type + 's'))
 
             self.statusBar().showMessage('Ready')
 
@@ -798,19 +792,18 @@ class MainWindow(QMainWindow):
 
         if self.mesh_data is not None:
             smooth_fun, pars = smooth_methods[self.mesh_smooth_method]
-            etype = '%d_%d' % (self.mesh_data.dim,
-                               self.mesh_data.conns[0].shape[-1])
-            if (etype == '2_2' or etype == '3_3') and pars['volume_corr']:
+            cells = self.mesh_data.cells[0]
+            if not(cells.type == 'tetra' or cells.type == 'hexahedron')\
+                    and pars['volume_corr']:
                 self.statusBar().showMessage('No volume mesh!')
 
             else:
-                self.mesh_data.coors = smooth_fun(self.mesh_data, **pars)
-
+                self.mesh_data.points = smooth_fun(self.mesh_data, **pars)
                 self.setLabelText(self.text_mesh_data,
-                                  '%d %s, smooth method - %s'\
-                                      % (self.mesh_data.n_el,
-                                         elem_tab[self.mesh_data.descs[0]],
-                                         self.mesh_smooth_method))
+                                  '%d %s, smooth method - %s'
+                                  % (cells.data.shape[0],
+                                     cells.type + 's',
+                                     self.mesh_smooth_method))
 
                 self.statusBar().showMessage('Ready')
 
@@ -821,8 +814,9 @@ class MainWindow(QMainWindow):
         if self.mesh_data is not None:
             vtk_file = 'mesh_geom.vtk'
             self.mesh_data.write(vtk_file)
-            view = QVTKViewer(vtk_file)
-            view.exec_()
+            os.system('paraview %s' % vtk_file)
+            # view = QVTKViewer(vtk_file)
+            # view.exec_()
 
         else:
             self.statusBar().showMessage('No mesh data!')
@@ -836,6 +830,7 @@ class MainWindow(QMainWindow):
     def changeSmoothMethod(self, val):
         self.mesh_smooth_method = str(val)
 
+
 usage = '%prog [options]\n' + __doc__.rstrip()
 help = {
     'dcm_dir': 'DICOM data direcotory',
@@ -843,15 +838,16 @@ help = {
     'seg_file': 'file with segmented data',
 }
 
+
 def main():
     parser = OptionParser(description='DICOM2FEM')
-    parser.add_option('-d','--dcmdir', action='store',
+    parser.add_option('-d', '--dcmdir', action='store',
                       dest='dcmdir', default=None,
                       help=help['dcm_dir'])
-    parser.add_option('-f','--dcmfile', action='store',
+    parser.add_option('-f', '--dcmfile', action='store',
                       dest='dcmfile', default=None,
                       help=help['dcm_file'])
-    parser.add_option('-s','--segfile', action='store',
+    parser.add_option('-s', '--segfile', action='store',
                       dest='segfile', default=None,
                       help=help['seg_file'])
 
@@ -870,6 +866,7 @@ def main():
         mw.loadSeg(filename=options.segfile)
 
     sys.exit(app.exec_())
+
 
 if __name__ == "__main__":
     main()
