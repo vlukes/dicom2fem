@@ -19,4 +19,6 @@ setuptools.setup(
     ],
     keywords='fem dicom',
     packages=['dicom2fem'],
+    include_package_data=True,
+    package_data={'': ['*.png']}
 )
