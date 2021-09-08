@@ -27,7 +27,8 @@ from seededitorqt import QTSeedEditor
 
 from seg2fem import gen_mesh_from_voxels, gen_mesh_from_voxels_mc
 from seg2fem import smooth_mesh
-# from viewer import QVTKViewer
+from viewer import QVTKViewer
+
 
 supported_formats = {
     'vtk': '.vtk',
@@ -814,9 +815,9 @@ class MainWindow(QMainWindow):
         if self.mesh_data is not None:
             vtk_file = 'mesh_geom.vtk'
             self.mesh_data.write(vtk_file)
-            os.system('paraview %s' % vtk_file)
-            # view = QVTKViewer(vtk_file)
-            # view.exec_()
+            # os.system('paraview %s' % vtk_file)
+            view = QVTKViewer(vtk_file)
+            view.exec_()
 
         else:
             self.statusBar().showMessage('No mesh data!')
