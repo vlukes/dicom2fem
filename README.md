@@ -25,6 +25,10 @@ or
 
 * Use [pip](https://pypi.org/project/pip/):
 
+      pip install dicom2fem
+
+  or
+
       pip install git+git://github.com/vlukes/dicom2fem
 
 
