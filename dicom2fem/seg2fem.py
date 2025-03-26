@@ -13,10 +13,10 @@ from scipy.io import loadmat
 import scipy.sparse as sps
 import numpy as nm
 from numpy.core import intc
-from marching_cubes import marching_cubes
-from genfem_base import set_nodemtx, get_snodes_uedges
 from scipy.special import factorial
 import meshio
+from .marching_cubes import marching_cubes
+from .genfem_base import set_nodemtx, get_snodes_uedges
 
 # gmsh3d_geo = """
 # Mesh.RemeshAlgorithm=1;
