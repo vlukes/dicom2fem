@@ -5,114 +5,33 @@ Simple VTK Viewer.
 
 Example:
 
-$ viewer.py -f head.vtk
+$ dicom2fem_view_mesh.py head.vtk
 """
 from optparse import OptionParser
 import sys
+import pyvista as pv
 
-import vtk
-from PyQt5.QtWidgets import QGridLayout, QDialog, QPushButton, QApplication
-import vtk.qt
-vtk.qt.QVTKRWIBase = 'QGLWidget'
-from vtk.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
+usage = '%prog file.vtk\n' + __doc__.rstrip()
 
 
-class QVTKViewer(QDialog):
-    """
-    Simple VTK Viewer.
-    """
-
-    def initUI(self):
-
-        grid = QGridLayout()
-        self.vtkWidget = QVTKRenderWindowInteractor(self)
-        grid.addWidget(self.vtkWidget, 0, 0, 1, 1)
-
-        btn_close = QPushButton("close", self)
-        btn_close.clicked.connect(self.close)
-        grid.addWidget(btn_close, 1, 0, 1, 1)
-
-        self.setLayout(grid)
-        self.setWindowTitle('VTK Viewer')
-        self.show()
-
-    def __init__(self, vtk_filename):
-        """
-        Initiate Viwer
-
-        Parameters
-        ----------
-        vtk_filename : str
-            Input VTK filename
-        """
-
-        QDialog.__init__(self)
-        self.initUI()
-
-        ren = vtk.vtkRenderer()
-        self.vtkWidget.GetRenderWindow().AddRenderer(ren)
-        iren = self.vtkWidget.GetRenderWindow().GetInteractor()
-
-        # VTK file
-        reader = vtk.vtkUnstructuredGridReader()
-        reader.SetFileName(vtk_filename)
-        reader.Update()
-
-        # VTK surface
-        surface = vtk.vtkDataSetSurfaceFilter()
-        surface.SetInputConnection(reader.GetOutputPort())
-        surface.Update()
-
-        mapper = vtk.vtkDataSetMapper()
-        mapper.SetInputConnection(surface.GetOutputPort())
-
-        actor = vtk.vtkActor()
-        actor.SetMapper(mapper)
-        actor.GetProperty().EdgeVisibilityOn()
-        actor.GetProperty().SetEdgeColor(1, 1, 1)
-        actor.GetProperty().SetLineWidth(0.5)
-        ren.AddActor(actor)
-
-        # annot. cube
-        axesActor = vtk.vtkAnnotatedCubeActor()
-        axesActor.SetXPlusFaceText('R')
-        axesActor.SetXMinusFaceText('L')
-        axesActor.SetYMinusFaceText('H')
-        axesActor.SetYPlusFaceText('F')
-        axesActor.SetZMinusFaceText('A')
-        axesActor.SetZPlusFaceText('P')
-        axesActor.GetTextEdgesProperty().SetColor(1, 1, 0)
-        axesActor.GetCubeProperty().SetColor(0, 0, 1)
-        self.axes = vtk.vtkOrientationMarkerWidget()
-        self.axes.SetOrientationMarker(axesActor)
-        self.axes.SetInteractor(iren)
-        self.axes.EnabledOn()
-        self.axes.InteractiveOn()
-
-        ren.ResetCamera()
-        iren.Initialize()
-
-
-usage = '%prog [options]\n' + __doc__.rstrip()
-help = {
-    'in_file': 'input VTK file with unstructured mesh',
-}
+def view_mesh(fname):
+    mesh = pv.read(fname)
+    plotter = pv.Plotter()
+    plotter.add_mesh(mesh, show_edges=True, color=[222, 135, 135],
+                     edge_color=[233, 175, 175], edge_opacity=0.2)
+    plotter.add_axes()
+    plotter.show(title=f'dicom2fem - mesh viewer: {fname}',
+                 interactive=True)
 
 
 def main():
-    parser = OptionParser(description='Simple VTK Viewer')
-    parser.add_option('-f','--filename', action='store',
-                      dest='in_filename', default=None,
-                      help=help['in_file'])
-    (options, args) = parser.parse_args()
+    parser = OptionParser(usage=usage)
+    _, args = parser.parse_args()
 
-    if options.in_filename is None:
+    if len(args) < 1:
         raise IOError('No VTK data!')
 
-    app = QApplication(sys.argv)
-    viewer = QVTKViewer(options.in_filename)
-    viewer.show()
-    sys.exit(app.exec_())
+    view_mesh(args[0])
 
 
 if __name__ == "__main__":
