@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["dicom2fem"]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+version = {attr = "dicom2fem.__version__"}
+
+[tool.setuptools.package-data]
+png = ["*.png"]
+
+[project.urls]
+homepage = "https://github.com/vlukes/dicom2fem"
+
+[project]
+name = "dicom2fem"
+dynamic = ["version"]
+readme = "README.md"
+description="Generation of finite element meshes from DICOM images"
+license = {file = "LICENSE"}
+authors = [{name = "Vladimír Lukeš", email = "vlukes@kme.zcu.cz"}]
+requires-python = ">= 3.8"
+dependencies = ["numpy", "scipy", "scikit-learn", "pyvista",
+                "io3d", "loguru", "imma", "imcut", "pygco", "seededitorqt"]
+keywords = ["fem", "dicom"]
+classifiers = [
+    "Development Status :: 4 - Beta",  # 3 - Alpha, 4 - Beta, 5 - Stable
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.scripts]
+dicom2fem = "dicom2fem.dicom2fem:main"
+dicom2fem_view_mesh = "dicom2fem.viewer:main"
