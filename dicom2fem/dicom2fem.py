@@ -25,9 +25,10 @@ from PyQt5.QtGui import QFont, QPixmap
 import io3d.dcmreaddata as dcmreader
 from seededitorqt import QTSeedEditor
 
-from seg2fem import gen_mesh_from_voxels, gen_mesh_from_voxels_mc
-from seg2fem import smooth_mesh
-from viewer import QVTKViewer
+from .seg2fem import gen_mesh_from_voxels, gen_mesh_from_voxels_mc
+from .seg2fem import smooth_mesh
+from .viewer import view_mesh
+from .__init__ import __version__
 
 
 supported_formats = {
@@ -308,7 +309,7 @@ class MainWindow(QMainWindow):
         font_info.setPixelSize(10)
 
         dicom2fem_title = QLabel('DICOM2FEM')
-        info = QLabel('Version: 2.0\n\n' +
+        info = QLabel(f'Version: {__version__}\n\n' +
                       'Developed by:\n' +
                       'University of West Bohemia\n' +
                       'Faculty of Applied Sciences\n' +
@@ -318,7 +319,7 @@ class MainWindow(QMainWindow):
         info.setFont(font_info)
         dicom2fem_title.setFont(font_label)
         dicom2fem_logo = QLabel()
-        logopath = os.path.join(path_to_script, 'brain.png')
+        logopath = os.path.join(path_to_script, 'png', 'brain.png')
         logo = QPixmap(logopath)
         dicom2fem_logo.setPixmap(logo)
         vbox1 = QVBoxLayout()
@@ -432,7 +433,7 @@ class MainWindow(QMainWindow):
         QApplication.processEvents()
 
         if self.dcmdir is None:
-            self.dcmdir = dcmreader.get_dcmdir_qt(app=True)
+            self.dcmdir = dcmreader.get_dcmdir_qt(app=True).decode('utf-8')
 
         if self.dcmdir is not None:
             dcr = dcmreader.DicomReader(os.path.abspath(self.dcmdir),
@@ -815,10 +816,7 @@ class MainWindow(QMainWindow):
         if self.mesh_data is not None:
             vtk_file = 'mesh_geom.vtk'
             self.mesh_data.write(vtk_file)
-            # os.system('paraview %s' % vtk_file)
-            view = QVTKViewer(vtk_file)
-            view.exec_()
-
+            view_mesh(vtk_file)
         else:
             self.statusBar().showMessage('No mesh data!')
 
