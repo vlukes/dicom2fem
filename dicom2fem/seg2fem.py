@@ -149,7 +149,7 @@ def smooth_mesh(mesh, n_iter=4, lam=0.6307, mu=-0.6347,
         nnd = el.shape[1]
 
         etype = '%d_%d' % (dim, nnd)
-        if etype == 'quad' or etype == 'hexahedron':
+        if etype == '2_4' or etype == '3_8':
             el = elems_q2t(el)
 
         nel = el.shape[0]
