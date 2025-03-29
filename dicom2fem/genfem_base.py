@@ -93,7 +93,7 @@ def unique_rows(a):
     order = nm.lexsort(a.T)
     a = a[order]
     diff = nm.diff(a, axis=0)
-    ui = nm.ones(len(a), dtype=nm.bool)
+    ui = nm.ones(len(a), dtype=bool)
     ui[1:] = (diff != 0).any(axis=1)
     uio = nm.zeros_like(ui)
     uio[order] = ui
@@ -123,7 +123,7 @@ def get_snodes_uedges(conns, etype):
     ufci, sfci = unique_rows(faces)
     ufaces = faces[ufci]
     sfaces = faces[sfci]
-    snodes = nm.zeros((nnd,), dtype=nm.bool)
+    snodes = nm.zeros((nnd,), dtype=bool)
     for ii in sfaces.T:
         snodes[(ii, )] = True
 
