@@ -23,7 +23,7 @@ description="Generation of finite element meshes from DICOM images"
 license = {file = "LICENSE"}
 authors = [{name = "Vladimír Lukeš", email = "vlukes@kme.zcu.cz"}]
 requires-python = ">= 3.8"
-dependencies = ["numpy", "scipy", "scikit-learn", "pyvista",
+dependencies = ["numpy", "scipy", "scikit-learn", "pyvista", "pydicom",
                 "io3d", "loguru", "imma", "imcut", "pygco", "seededitorqt"]
 keywords = ["fem", "dicom"]
 classifiers = [
